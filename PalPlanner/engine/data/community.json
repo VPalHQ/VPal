@@ -1,0 +1,899 @@
+{
+  "v": 1,
+  "checked": "2026-11-18",
+  "about": "What guide writers and wikis recommend for Palworld 1.0, summarized with links. Reddit pages could not be read by the tool that gathered these, so they come from guide sites, wikis and Steam discussions. The planner gives these pals a small boost when two of your pals are otherwise close.",
+  "sources": {
+    "pindrop": {
+      "t": "PinDrop: Palworld best teams (checked on v1.0.5)",
+      "u": "https://pindrop.gg/palworld/guides/palworld-best-teams",
+      "d": "Oct 23, 2026"
+    },
+    "keen-towers": {
+      "t": "KeenGamer: All tower bosses in order and how to beat them",
+      "u": "https://www.keengamer.com/articles/guides/palworld-1-0-all-tower-bosses-in-order-and-how-to-beat-them/",
+      "d": "Jul 17, 2026"
+    },
+    "ath-raids": {
+      "t": "AllThings.How: Best Pal teams to beat every raid boss (1.0)",
+      "u": "https://allthings.how/palworld-1-0-best-pal-teams-to-beat-every-raid-boss/",
+      "d": "Jul 18, 2026"
+    },
+    "ath-arena": {
+      "t": "AllThings.How: Orserk carry team for Legend rank arena",
+      "u": "https://allthings.how/palworld-1-0-orserk-carry-team-for-legend-rank-arena/",
+      "d": "Jul 14, 2026"
+    },
+    "ath-hard": {
+      "t": "AllThings.How: Best party builds for Hard Mode bosses",
+      "u": "https://allthings.how/palworld-1-0-best-party-builds-for-deleting-hard-mode-bosses/",
+      "d": "Jul 28, 2026"
+    },
+    "ath-combat": {
+      "t": "AllThings.How: Best combat pals and damage party builds",
+      "u": "https://allthings.how/palworld-1-0-the-best-combat-pals-and-damage-party-builds/",
+      "d": "Jul 20, 2026"
+    },
+    "ath-base": {
+      "t": "AllThings.How: Best base pals for every work job (1.0)",
+      "u": "https://allthings.how/palworld-1-0-best-base-pals-for-every-work-job/",
+      "d": "Jul 12, 2026"
+    },
+    "gamever-eggs": {
+      "t": "Gamever: Five breeding partner skills in Palworld",
+      "u": "https://gamever.io/knowledge-base/five-breeding-partner-skills-in-palworld-two-of-them-make-alpha-eggs",
+      "d": "1.0"
+    },
+    "meinmmo-alpha": {
+      "t": "Mein-MMO: Getting Alphas with the right companions",
+      "u": "https://mein-mmo.de/en/with-the-right-companions-in-palworld-you-can-easily-secure-powerful-alphas-without-having-to-fight-them,1578741/",
+      "d": "Jul 20, 2026"
+    },
+    "vgc-chromite": {
+      "t": "VGC: Palworld 1.0 Chromite best farm location",
+      "u": "https://www.videogameschronicle.com/guide/palworld-10-chromite-best-farm-location/",
+      "d": "Jul 14, 2026"
+    },
+    "moba-mining": {
+      "t": "Mobalytics: Best mining pals for farming",
+      "u": "https://mobalytics.gg/gamebase/guides/palworld-best-mining-pals-for-farming",
+      "d": "Jul 24, 2026"
+    },
+    "ath-gold": {
+      "t": "AllThings.How: Farm Gold, Dog Coins and Bounty Tokens fast",
+      "u": "https://allthings.how/palworld-1-0-how-to-farm-gold-dog-coins-and-bounty-tokens-fast/",
+      "d": "Aug 7, 2026"
+    },
+    "ath-fishing": {
+      "t": "AllThings.How: Fishing guide and the hands-off fishing party",
+      "u": "https://allthings.how/palworld-1-0-fishing-guide-rods-bait-and-the-hands-off-auto-fishing-party/",
+      "d": "Aug 17, 2026"
+    },
+    "ath-level": {
+      "t": "AllThings.How: How to level pals fast to 80",
+      "u": "https://allthings.how/palworld-1-0-how-to-level-pals-fast-to-80/",
+      "d": "Jul 24, 2026"
+    },
+    "wiki-schem": {
+      "t": "Palworld Wiki: Schematics",
+      "u": "https://palworld.wiki.gg/wiki/Blueprint",
+      "d": "wiki"
+    },
+    "ath-monitor": {
+      "t": "AllThings.How: How to use the Monitoring Stand (1.0)",
+      "u": "https://allthings.how/palworld-1-0-how-to-use-the-monitoring-stand/",
+      "d": "Jul 20, 2026"
+    },
+    "ath-lv10": {
+      "t": "AllThings.How: How to get Level 10 work suitability pals",
+      "u": "https://allthings.how/palworld-1-0-how-to-get-level-10-work-suitability-base-pals-fast/",
+      "d": "Jul 14, 2026"
+    },
+    "nodecraft-condense": {
+      "t": "Nodecraft: How Pal condensation changed in 1.0",
+      "u": "https://nodecraft.com/support/games/palworld/general/how-pal-condensation-changed-in-palworld-1-0",
+      "d": "1.0"
+    },
+    "dtgre-speed": {
+      "t": "Palworld 1.0 work speed explained (community testing)",
+      "u": "https://www.dtgre.com/2026/07/palworld-1-0-work-speed-explained-level-10-workers.html",
+      "d": "Jul 19, 2026"
+    },
+    "wiki-work": {
+      "t": "Palworld Wiki: Work Suitability",
+      "u": "https://palworld.wiki.gg/wiki/Work_Suitability",
+      "d": "wiki"
+    },
+    "keen-oil": {
+      "t": "KeenGamer: Crude oil locations and farming guide (1.0)",
+      "u": "https://www.keengamer.com/articles/guides/palworld-1-0-crude-oil-locations-and-farming-guide/",
+      "d": "Aug 1, 2026"
+    },
+    "vgc-oil": {
+      "t": "VGC: Palworld 1.0 Crude Oil best farming methods",
+      "u": "https://www.videogameschronicle.com/guide/palworld-10-crude-oil-best-farming-methods/",
+      "d": "Jul 22, 2026"
+    }
+  },
+  "farming": {
+    "field-eggs": {
+      "picks": [
+        "Broncherry Aqua",
+        "Broncherry",
+        "Grintale"
+      ],
+      "notes": [
+        "Guides agree: Broncherry Aqua (or Broncherry) plus Grintale in your party is the egg-hunting combo, and each needs its saddle crafted before the skill works.",
+        "One guide says carrying both Broncherry and Broncherry Aqua stacks to about 80%. The game marks the skill “does not stack”, so the planner only counts your best one.",
+        "Guides also use the same party when collecting eggs from your own Breeding Farm, with Braloha working at the base to speed egg production and Dynamoff to speed hatching."
+      ],
+      "src": [
+        "gamever-eggs",
+        "meinmmo-alpha"
+      ]
+    },
+    "field-ore": {
+      "picks": [
+        "Astegon",
+        "Digtoise",
+        "Fuddler",
+        "Turtacle",
+        "Reptyro",
+        "Lunaris"
+      ],
+      "notes": [
+        "Mining guides build around Fuddler (faster mining, lighter stone), Turtacle or Reptyro (lighter ore) and Lunaris or Cattiva (more carrying capacity).",
+        "Digtoise spinning beside you is the usual pick for fast hand mining. Turtacle Terra does the same weight trick for Sulfur and Coal."
+      ],
+      "src": [
+        "moba-mining"
+      ]
+    },
+    "field-wood": {
+      "picks": [
+        "Eikthyrdeer",
+        "Mammorest",
+        "Gumoss"
+      ],
+      "notes": [
+        "Ride Eikthyrdeer or Mammorest while chopping; Gumoss in the party makes wood lighter."
+      ],
+      "src": []
+    },
+    "field-chromite": {
+      "picks": [
+        "Smokie"
+      ],
+      "notes": [
+        "You need the Metal Detector (Technology 58) in your bag. A good spot: the Silvegis arena inside Shield Dragon Tunnel on Feybreak; Chromite pops up after you beat both Silvegis.",
+        "Keep Smokie out with you while you dig."
+      ],
+      "src": [
+        "vgc-chromite"
+      ]
+    },
+    "field-drops": {
+      "picks": [
+        "Katress",
+        "Blazehowl Noct",
+        "Nitemary",
+        "Dumud Gild"
+      ],
+      "notes": [
+        "Pick the drop booster that matches the element you’re hunting; they work from the party, so you can carry several."
+      ],
+      "src": [
+        "ath-gold"
+      ]
+    },
+    "field-gold": {
+      "picks": [
+        "Dumud Gild",
+        "Katress",
+        "Blazehowl Noct",
+        "Maraith"
+      ],
+      "notes": [
+        "Dog Coins: hunt high-level Mimogs in the World Tree’s icy area on a fast flyer, with Katress or Blazehowl Noct boosting Neutral drops (about 500–600 coins per Mimog at full rank) and Maraith cutting cooldowns after each kill.",
+        "Gold: guides breed Alpha Dumud Gild (they sell for more) using Broncherry Aqua plus Grintale on egg pickup."
+      ],
+      "src": [
+        "ath-gold"
+      ]
+    },
+    "field-capture": {
+      "picks": [
+        "Katress",
+        "Lunaris",
+        "Yakumo"
+      ],
+      "notes": [
+        "Bounty hunters use a 4-star Yakumo with drop passives: its skill can pass those passives to the target you catch, then butcher it for more tokens."
+      ],
+      "src": [
+        "ath-gold"
+      ]
+    },
+    "field-fishing": {
+      "picks": [
+        "Gloopie",
+        "Whalaska Ignis",
+        "Whalaska",
+        "Jelliette",
+        "Solmora Lux"
+      ],
+      "notes": [
+        "The popular hands-off fishing party is Gloopie, Whalaska (the Ignis one is stronger), Jelliette and Solmora Lux."
+      ],
+      "src": [
+        "ath-fishing"
+      ]
+    },
+    "field-treasure": {
+      "picks": [
+        "Tombat",
+        "Mimog",
+        "Nox",
+        "Flopie"
+      ],
+      "notes": [],
+      "src": []
+    },
+    "field-leveling": {
+      "picks": [
+        "Omascul"
+      ],
+      "notes": [
+        "Fastest method in guides: low-level pals plus a condensed Omascul and a strong carry in your party, Growth Acceleration Bell equipped, then clear high-level tower bosses. Omascul’s bonus doesn’t stack, so one is enough."
+      ],
+      "src": [
+        "ath-level"
+      ]
+    }
+  },
+  "bosses": {
+    "Grizzbolt": {
+      "picks": [
+        "Gumoss",
+        "Rushoar",
+        "Fuddler",
+        "Aegidron",
+        "Necromus",
+        "Bastigor"
+      ],
+      "notes": [
+        "Early (Lv 10): Ground pals like Rushoar and Fuddler, plus Gumoss.",
+        "Hard mode (Lv 72): Aegidron, Necromus and Bastigor as the core three."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Lyleen": {
+      "picks": [
+        "Foxparks",
+        "Arsox",
+        "Jetragon",
+        "Incineram Noct",
+        "Splatterina"
+      ],
+      "notes": [
+        "Early: Fire pals like Foxparks and Arsox.",
+        "Hard mode: Jetragon, Incineram Noct and Splatterina."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Orserk": {
+      "picks": [
+        "Frostallion",
+        "Paladius",
+        "Bastigor"
+      ],
+      "notes": [
+        "Ice and Ground pals; for hard mode, Frostallion, Paladius and Bastigor."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Faleris": {
+      "picks": [
+        "Jormuntide",
+        "Azurobe",
+        "Penking",
+        "Panthalus",
+        "Shaolong",
+        "Neptilius"
+      ],
+      "notes": [
+        "Water pals: Jormuntide, Azurobe or Penking early; Panthalus, Shaolong and Neptilius for hard mode.",
+        "A Selyne carry with two boosted Holy Bursts while mounted is a popular fast clear on hard mode."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop",
+        "ath-hard"
+      ]
+    },
+    "Shadowbeak": {
+      "picks": [
+        "Jetragon",
+        "Astegon",
+        "Jormuntide",
+        "Shaolong",
+        "Blazamut Ryu"
+      ],
+      "notes": [
+        "Dragon pals: Jetragon, Astegon, Jormuntide; Shaolong and Blazamut Ryu for hard mode."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Selyne": {
+      "picks": [
+        "Jetragon",
+        "Astegon",
+        "Jormuntide",
+        "Shaolong",
+        "Blazamut Ryu"
+      ],
+      "notes": [
+        "Dragon pals again: Jetragon, Astegon, Jormuntide; Shaolong and Blazamut Ryu for hard mode."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Bastigor": {
+      "picks": [
+        "Knocklem Ignis",
+        "Moldron",
+        "Dupin",
+        "Wixen"
+      ],
+      "notes": [
+        "Strong Fire attackers: Knocklem Ignis, Moldron, Dupin.",
+        "Hard mode: a Knocklem carry, or Wixen with four Gobfins, are reported as very fast clears."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop",
+        "ath-hard"
+      ]
+    },
+    "Shaolong": {
+      "picks": [
+        "Frostallion",
+        "Paladius",
+        "Bastigor"
+      ],
+      "notes": [
+        "Electric and Ice attackers; Frostallion, Paladius and Bastigor are the usual core."
+      ],
+      "src": [
+        "keen-towers",
+        "pindrop"
+      ]
+    },
+    "Astralym": {
+      "picks": [
+        "Jetragon",
+        "Frostallion",
+        "Necromus",
+        "Jormuntide Ignis"
+      ],
+      "notes": [
+        "No element to exploit: bring your highest-damage pals. A common all-round party is Jetragon, Frostallion, Necromus and Jormuntide Ignis plus a pal that can stun."
+      ],
+      "src": [
+        "keen-towers",
+        "ath-combat"
+      ]
+    },
+    "Dandilord": {
+      "picks": [
+        "Shaolong",
+        "Blazamut Ryu",
+        "Jetragon"
+      ],
+      "notes": [
+        "Shaolong, Blazamut Ryu and Jetragon as the core three."
+      ],
+      "src": [
+        "pindrop"
+      ]
+    },
+    "Silvance": {
+      "picks": [
+        "Knocklem Ignis",
+        "Moldron",
+        "Dupin"
+      ],
+      "notes": [
+        "Fire attackers: Knocklem Ignis, Moldron, Dupin."
+      ],
+      "src": [
+        "pindrop"
+      ]
+    },
+    "Panthalus": {
+      "picks": [
+        "Orserk",
+        "Azurmane",
+        "Relaxaurus Lux"
+      ],
+      "notes": [
+        "Water boss: Electric attackers. PinDrop’s Electric core is Orserk, Azurmane and Relaxaurus Lux."
+      ],
+      "src": [
+        "pindrop"
+      ]
+    },
+    "Bellanoir": {
+      "picks": [
+        "Chillet",
+        "Chillet Ignis",
+        "Elphidran",
+        "Quivern",
+        "Relaxaurus",
+        "Jormuntide",
+        "Xenogard"
+      ],
+      "notes": [
+        "Party: Chillet, Chillet Ignis, Elphidran, Quivern. Base defenders: Relaxaurus, Relaxaurus Lux, Jormuntide, Xenogard."
+      ],
+      "src": [
+        "ath-raids"
+      ]
+    },
+    "Bellanoir Libero": {
+      "picks": [
+        "Chillet",
+        "Elphidran",
+        "Ragnahawk",
+        "Knocklem",
+        "Jormuntide",
+        "Xenogard",
+        "Jormuntide Ignis",
+        "Blazamut"
+      ],
+      "notes": [
+        "Phase 1 is Dark (bring Dragon), phase 2 turns Ice (bring Fire). Keep a second party boxed so you can swap."
+      ],
+      "src": [
+        "ath-raids"
+      ]
+    },
+    "Blazamut Ryu": {
+      "picks": [
+        "Lovander",
+        "Felbat",
+        "Xenogard",
+        "Aegidron",
+        "Neptilius",
+        "Jormuntide",
+        "Anubis",
+        "Bulldosu",
+        "Gildane"
+      ],
+      "notes": [
+        "Water first; below about 10% health it turns Electric, so swap to Ground (Anubis, Bulldosu). Life-steal pals like Felbat and Lovander help in long fights."
+      ],
+      "src": [
+        "ath-raids"
+      ]
+    },
+    "Xenolord": {
+      "picks": [
+        "Frostallion",
+        "Icelyn",
+        "Bastigor",
+        "Orserk",
+        "Jetragon"
+      ],
+      "notes": [
+        "Ice: Frostallion as mount and fighter, plus Bastigor. Bring a Plasma Cannon to clear the adds it summons."
+      ],
+      "src": [
+        "ath-raids"
+      ]
+    },
+    "Hartalis": {
+      "picks": [
+        "Renjishi",
+        "Orserk",
+        "Eidrolon Ignis",
+        "Dupin",
+        "Frostallion Noct",
+        "Necromus",
+        "Bellanoir"
+      ],
+      "notes": [
+        "It cycles Grass, Water and Ground barriers: Fire and Electric first, then Dark to break the phase 2 barrier. Each barrier must break within 15 seconds."
+      ],
+      "src": [
+        "ath-raids"
+      ]
+    },
+    "_arena": {
+      "picks": [
+        "Orserk",
+        "Ophydia",
+        "Shaolong",
+        "Aegidron",
+        "Moldron Cryst"
+      ],
+      "notes": [
+        "Only your first pal’s partner skill works in the arena, so lead with the one whose skill helps most. A popular Legend team leads with Orserk (its hits stack Attack and Defense) with Ophydia and Shaolong, or Aegidron and Moldron Cryst for a sturdier side."
+      ],
+      "src": [
+        "ath-arena"
+      ]
+    }
+  },
+  "jobs": {
+    "mining": {
+      "picks": [
+        "Blazamut",
+        "Astegon",
+        "Aegidron",
+        "Digtoise",
+        "Anubis",
+        "Menasting"
+      ],
+      "buff": "Tetroise",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "logging": {
+      "picks": [
+        "Celesdir",
+        "Hartalis",
+        "Bushi",
+        "Prixter",
+        "Warsect",
+        "Silvegis"
+      ],
+      "buff": "Eikthyrdeer Terra",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "smelting": {
+      "picks": [
+        "Renjishi",
+        "Jormuntide Ignis",
+        "Blazamut Ryu",
+        "Ragnahawk",
+        "Blazehowl",
+        "Suzaku",
+        "Faleris"
+      ],
+      "buff": "Katress Ignis",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "cooking": {
+      "picks": [
+        "Renjishi",
+        "Jormuntide Ignis",
+        "Blazamut Ryu",
+        "Frostallion",
+        "Whalaska"
+      ],
+      "buff": "Katress Ignis",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "crafting": {
+      "picks": [
+        "Solenne",
+        "Selyne",
+        "Anubis",
+        "Lunaris",
+        "Verdash",
+        "Lyleen"
+      ],
+      "buff": "Ribbuny",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "electricity": {
+      "picks": [
+        "Orserk",
+        "Azurmane",
+        "Relaxaurus Lux",
+        "Grizzbolt"
+      ],
+      "buff": "Puffolt",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "medicine": {
+      "picks": [
+        "Bellanoir",
+        "Bellanoir Libero",
+        "Vaelet",
+        "Felbat",
+        "Lyleen",
+        "Selyne"
+      ],
+      "buff": "",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "crops": {
+      "picks": [
+        "Ophydia",
+        "Lyleen",
+        "Broncherry",
+        "Petallia",
+        "Prunelia",
+        "Suzaku Aqua",
+        "Jormuntide",
+        "Faleris Aqua",
+        "Frostallion Noct",
+        "Jetragon",
+        "Verdash"
+      ],
+      "buff": "Petallia",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "ranch": {
+      "picks": [
+        "Vixy",
+        "Chikipi",
+        "Mozzarina",
+        "Beegarde"
+      ],
+      "buff": "Cinnamoth",
+      "src": [
+        "ath-base"
+      ]
+    },
+    "oil": {
+      "picks": [
+        "Wumpo",
+        "Knocklem"
+      ],
+      "buff": "Wumpo",
+      "src": [
+        "ath-base"
+      ]
+    }
+  },
+  "base_tips": {
+    "tips": [
+      {
+        "title": "Work level beats everything else",
+        "text": "In 1.0 work levels go up to 10 and output climbs steeply: testers measured a Lv 10 Kindling or Handiwork worker at roughly 3 times a Lv 8 one, and about 8 times a Lv 4 one. Raise levels first, then worry about work-speed passives.",
+        "src": [
+          "dtgre-speed",
+          "wiki-work"
+        ]
+      },
+      {
+        "title": "Condense your best workers",
+        "text": "Each condenser star adds +1 to a work skill (stars 1–3 start from the pal’s highest skill), and the 4th star adds +1 to every skill. That takes a natural Lv 8 specialist to Lv 10. Full condensing takes 48 copies: 4, then 8, 12 and 24. Each star also adds work speed.",
+        "src": [
+          "nodecraft-condense",
+          "ath-lv10",
+          "wiki-work"
+        ]
+      },
+      {
+        "title": "Specialists beat all-rounders",
+        "text": "A pal that does one job at a high level beats one that does five jobs at a low level, because all-rounders wander between tasks. Fill Handiwork and Mining first: Handiwork runs every crafting bench and Mining feeds your ingots.",
+        "src": [
+          "ath-base",
+          "dtgre-speed"
+        ]
+      },
+      {
+        "title": "Use the Monitoring Stand",
+        "text": "Technology Lv 7. Press V for the work grid and switch off every job except the one you want for multi-talented pals. Press C to pin a pal to one station. Work mode (F) sets effort for the whole base: Hard and Super Hard are faster but burn sanity and food, so use them only in short bursts. The High Quality stand (Lv 28) also lowers the sanity cost.",
+        "src": [
+          "ath-monitor"
+        ]
+      },
+      {
+        "title": "One base-buff pal per job, per base",
+        "text": "Tetroise, Petallia, Ribbuny, Katress Ignis, Puffolt, Wumpo, Cinnamoth, Eikthyrdeer Terra, Smokie Cryst, Clovee, Amione and Mycora each add +1 to one job for every other pal at that base. A second copy does nothing, and the bonus matters most while your workers are below Lv 10.",
+        "src": [
+          "ath-base",
+          "dtgre-speed"
+        ]
+      },
+      {
+        "title": "Breed in work-speed passives last",
+        "text": "Artisan (+50%), Serious and Lucky stack on top of a high work level. They pass down through breeding, so line them up once your workers have the levels. Nocturnal pals keep working at night.",
+        "src": [
+          "ath-base",
+          "dtgre-speed"
+        ]
+      },
+      {
+        "title": "Keep them fed, rested and close to storage",
+        "text": "Keep the Feed Box stocked with strong food, build a Hot Spring for sanity, and build the work-speed structures (up to +20%). Put storage chests right next to mining and production stations so haulers have short trips.",
+        "src": [
+          "ath-base",
+          "wiki-work",
+          "dtgre-speed"
+        ]
+      },
+      {
+        "title": "Applied Technique Books",
+        "text": "Each book adds +1 to one skill (Cooling, Handiwork, Kindling, Lumbering or Mining) for that one pal. They are rare (about 1% from big chests on Lv 60 oil rigs), and the bonus doesn’t pass to children or carry over when that pal is fed into the condenser, so use them on your finished workers.",
+        "src": [
+          "dtgre-speed"
+        ]
+      }
+    ]
+  },
+  "focus_tips": {
+    "oil": [
+      {
+        "text": "No pal works the pump: a Crude Oil Extractor runs on electricity alone. Each one draws 2,000 power (High-Pressure ones 3,000), so this base is really a power plant. Your Electric pals on the generators are what keep oil flowing.",
+        "src": [
+          "keen-oil",
+          "vgc-oil"
+        ]
+      },
+      {
+        "text": "Best power pals in guides: Orserk (Electricity 8), Solmora Lux and Dynamoff (6), Grizzbolt (5). Puffolt living at the base gives every other pal +1 Generating Electricity.",
+        "src": [
+          "keen-oil"
+        ]
+      },
+      {
+        "text": "Research the three Crude Oil Extraction Speed upgrades (+20%, +30%, +40%) at the Pal Labor Research Laboratory.",
+        "src": [
+          "keen-oil"
+        ]
+      },
+      {
+        "text": "Lock your Electric pals to Generating Electricity with the Monitoring Stand, build the generators close to where they rest, and put storage right next to the extractors so haulers have short trips. Wumpo adds +1 Transporting for every other pal.",
+        "src": [
+          "keen-oil",
+          "ath-monitor"
+        ]
+      },
+      {
+        "text": "Wall in the generators and extractors: raids go for them, and a broken generator stops all the oil.",
+        "src": [
+          "keen-oil"
+        ]
+      },
+      {
+        "text": "Sunlit Isle, about (401, -467), has three oil fields inside one Palbox range, and guides call it the best oil spot.",
+        "src": [
+          "keen-oil",
+          "vgc-oil"
+        ]
+      }
+    ],
+    "mining": [
+      {
+        "text": "Mining pits need Mining pals; haulers carry the ore. Fill the base with Mining specialists and a few strong haulers.",
+        "src": [
+          "ath-base"
+        ]
+      },
+      {
+        "text": "Tetroise at the base gives every other pal +1 Mining. Wumpo gives +1 Transporting.",
+        "src": [
+          "ath-base",
+          "dtgre-speed"
+        ]
+      },
+      {
+        "text": "Put storage right next to the pits, and lock miners to Mining with the Monitoring Stand so they don’t wander off.",
+        "src": [
+          "dtgre-speed",
+          "ath-monitor"
+        ]
+      }
+    ],
+    "smelting": [
+      {
+        "text": "Furnaces need Kindling pals; haulers bring ore in and carry ingots out. The Gigantic Furnace runs on power, so add Electric pals for it.",
+        "src": [
+          "ath-base"
+        ]
+      },
+      {
+        "text": "Katress Ignis at the base gives every other pal +1 Kindling.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "crafting": [
+      {
+        "text": "Workshops, assembly lines and benches all use Handiwork, and the advanced ones need 1,000 power each.",
+        "src": [
+          "ath-base"
+        ]
+      },
+      {
+        "text": "Ribbuny gives every other pal +1 Handiwork. Ribbuny Botan works far faster at weapon benches, and a Sekhmet makes every Anubis at the base work faster.",
+        "src": [
+          "ath-base"
+        ]
+      },
+      {
+        "text": "Handiwork is the job to level first: it runs every crafting bench.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "lumber": [
+      {
+        "text": "Logging sites need Lumbering pals; Eikthyrdeer Terra gives every other pal +1 Lumbering.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "farming": [
+      {
+        "text": "Plantations need Planting, Watering and Gathering; the Mill needs Watering; kitchens need Kindling; fridges and cold food boxes need Cooling.",
+        "src": [
+          "wiki-work"
+        ]
+      },
+      {
+        "text": "Lullu (faster growth), Prunelia (bigger harvests), Petallia (+1 Planting), Amione (+1 Watering) and Clovee (+1 Gathering) all stack at a farming base.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "ranch": [
+      {
+        "text": "Ranch pals drop items on their own: Chikipi eggs, Mozzarina milk, Beegarde honey, Vixy items. Cinnamoth gives every other pal +1 Farming.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "breeding": [
+      {
+        "text": "The Breeding Farm takes any two pals and needs cake in its box. Braloha at the base speeds up egg production and Dynamoff speeds up hatching.",
+        "src": [
+          "ath-base"
+        ]
+      },
+      {
+        "text": "Cake takes flour, red berries, milk, eggs and honey, so a breeding base wants a small farm and ranch beside it.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ],
+    "medicine": [
+      {
+        "text": "Medicine benches need Medicine Production pals, and the advanced bench needs power. Mycora gives every other pal +1 Medicine Production.",
+        "src": [
+          "ath-base"
+        ]
+      }
+    ]
+  }
+}
