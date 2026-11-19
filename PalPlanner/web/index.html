@@ -958,17 +958,45 @@ async function askDiscordOnce(tries){
   VOICE = v;
   if (!v || !v.invite || store.get('vega-discord-asked') || document.querySelector('.overlay')) return;
   store.set('vega-discord-asked', new Date().toISOString());
+  discordSheet(v, true);
+}
+
+// Getting into the family's Discord. Discord's web invite page pushes anyone who isn't signed in there into making a
+// new account, so people who already have Discord copy the invite and paste it into their Discord app instead.
+function discordSheet(v, once){
   const ov = document.createElement('div');
   ov.className = 'overlay';
+  const wide = 'display:flex;align-items:center;justify-content:center;text-decoration:none';
   ov.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dcT">
-    <h3 id="dcT">Join our Discord?</h3>
-    <p class="meta" style="margin:0">That’s where we talk while we play${v.server?`: <b>${esc(v.server)}</b>`:''}. Once you’re in, the Voice tab gets you into the voice channel with one tap. You’ll only be asked this once.</p>
-    <div class="row"><a class="btn primary" href="${esc(v.invite)}" target="_blank" rel="noopener" data-yes style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none">Yes, join</a><button class="btn" type="button" data-no style="flex:1">No thanks</button></div></div>`;
+    <h3 id="dcT">${once ? 'Join our Discord?' : 'Join our Discord'}</h3>
+    <p class="meta" style="margin:0">That’s where we talk while we play${v.server?`: <b>${esc(v.server)}</b>`:''}. Once you’re in, the Voice tab gets you into the voice channel with one tap.${once?' You’ll only be asked this once.':''}</p>
+    <div data-pick style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn primary" type="button" data-have>I already have Discord</button>
+      <a class="btn" href="${esc(v.invite)}" target="_blank" rel="noopener" data-new style="${wide}">I’m new to Discord</a>
+      <button class="btn" type="button" data-no>${once ? 'No thanks' : 'Close'}</button>
+    </div>
+    <div data-steps style="display:none;flex-direction:column;gap:10px">
+      <p class="meta" style="margin:0"><b>1.</b> Copy the invite.</p>
+      <input data-link readonly value="${esc(v.invite)}" aria-label="Invite link" style="min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--fg);font:inherit;padding:0 12px;width:100%;box-sizing:border-box">
+      <button class="btn primary" type="button" data-copy>Copy invite</button>
+      <p class="meta" style="margin:0"><b>2.</b> Open the Discord app and sign in as usual. Tap <b>+</b> (Add a Server) › <b>Join a Server</b>, paste the invite and tap <b>Join</b>.</p>
+      <a class="btn" href="discord://" data-open style="${wide}">Open the Discord app</a>
+      <p class="meta" style="margin:0">Using Discord in a web browser instead? Open the invite and tap <b>Already have an account?</b> under the name box to log in first.</p>
+      <button class="btn" type="button" data-no>Done</button>
+    </div></div>`;
   document.body.appendChild(ov);
-  const close = ()=>ov.remove();
-  ov.querySelector('[data-no]').addEventListener('click', close);
-  ov.querySelector('[data-yes]').addEventListener('click', ()=>setTimeout(close, 50));
-  ov.querySelector('[data-yes]').focus();
+  const q = s => ov.querySelector(s), close = ()=>ov.remove();
+  ov.querySelectorAll('[data-no]').forEach(b=>b.addEventListener('click', close));
+  q('[data-new]').addEventListener('click', ()=>setTimeout(close, 50));
+  q('[data-have]').addEventListener('click', ()=>{ q('[data-pick]').style.display='none'; q('[data-steps]').style.display='flex'; q('[data-copy]').focus(); });
+  q('[data-copy]').addEventListener('click', async ()=>{
+    const inp = q('[data-link]'), btn = q('[data-copy]');
+    let ok = false;
+    try { await navigator.clipboard.writeText(v.invite); ok = true; } catch(e){}
+    if (!ok){ inp.focus(); inp.select(); try { ok = document.execCommand('copy'); } catch(e){} }
+    btn.textContent = ok ? 'Copied. Now paste it in Discord' : 'Select the link above and copy it';
+  });
+  q('[data-have]').focus();
 }
 
 function start(){
@@ -1881,7 +1909,7 @@ function paintVoice(){
       <a class="btn primary" href="${esc(v.joinUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none;min-height:52px;font-size:17px">Join voice</a>
       <p class="meta" style="margin:0">Opens Discord on the voice channel. Tap <b>Join Voice</b> there. To talk through your console instead, tap <b>Join on PlayStation</b> or <b>Join on Xbox</b> in that screen.</p>
       <p class="meta" style="margin:0">Discord app didn’t open? <a href="${esc(v.appUrl)}" style="color:var(--accent)">Try this link</a>.</p>
-      <p class="meta" style="margin:0">Join voice only works once you’re in our Discord server. ${v.invite?`Not in it yet? <a href="${esc(v.invite)}" target="_blank" rel="noopener" style="color:var(--accent)">Join the server first</a>, then come back and tap Join voice.`:'Not in it yet? Ask the server owner for an invite.'}</p>
+      <p class="meta" style="margin:0">Join voice only works once you’re in our Discord server. ${v.invite?`Not in it yet? <a href="#" data-joinserver style="color:var(--accent)">Join the server first</a>, then come back and tap Join voice.`:'Not in it yet? Ask the server owner for an invite.'}</p>
     </div>
     <div class="card"><div class="kicker">In voice now</div>${who}</div>
     <details class="card"><summary><b>Join from a PS5 or Xbox, no phone needed</b></summary>
@@ -1890,6 +1918,8 @@ function paintVoice(){
       <p class="meta" style="margin:0"><b>Xbox:</b> press the Xbox button for the Guide › Parties &amp; chats › Discord › pick the server and <b>${esc(v.channel||'the voice channel')}</b>.</p>
     </details>
 `;
+  const js = $('#view').querySelector('[data-joinserver]');
+  if (js) js.addEventListener('click', e=>{ e.preventDefault(); if (!document.querySelector('.overlay')) discordSheet(v, false); });
 }
 let UNLOCK_CODE = '', liveLayer = null, liveTimer = null, liveOff = false;
 // Live positions: everyone online right now, from the server (through the Command Center on the server PC).

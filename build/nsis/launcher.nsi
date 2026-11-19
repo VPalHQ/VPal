@@ -6,11 +6,11 @@ OutFile "..\files\VPal.exe"
 Icon "..\vpal.ico"
 RequestExecutionLevel user
 SilentInstall silent
-VIProductVersion "0.5.1.0"
+VIProductVersion "0.5.2.0"
 VIAddVersionKey "ProductName" "VPal Server Command Center"
 VIAddVersionKey "FileDescription" "VPal Server Command Center"
-VIAddVersionKey "FileVersion" "0.5.1"
-VIAddVersionKey "ProductVersion" "0.5.1"
+VIAddVersionKey "FileVersion" "0.5.2"
+VIAddVersionKey "ProductVersion" "0.5.2"
 VIAddVersionKey "LegalCopyright" "Unofficial fan tool, not affiliated with Pocketpair"
 
 Section

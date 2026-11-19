@@ -6,6 +6,8 @@ A free control panel for running a **Palworld dedicated server on your own Windo
 
 **Status: beta.** It runs a real family server every day, but expect rough edges. Please report problems on the [Issues](../../issues) tab.
 
+**VPal is free.** It's built by one person in his spare time, so if it saves you some headaches, a tip on [Ko-fi](https://ko-fi.com/vpalhq) helps keep it going.
+
 ## What it does
 
 - **Setup in one window.** It downloads the free Palworld Dedicated Server from Steam, writes its settings from a few questions, adds the firewall rules and shows exactly what to forward on your router.
@@ -51,6 +53,10 @@ Settings > Apps > **VPal Server Command Center** > Uninstall. Your Palworld serv
 - `build/` has the NSIS 3 installer scripts and `make_release.py`, which makes a release's update zip and `vpal-update.json`.
 
 Releases also bundle these third-party libraries (Windows x64), which are not in this repository: psutil 7.0.0 in `CommandCenter/service/lib`, and PyCryptodome 3.23.0 and pyooz 0.0.8 in `PalPlanner/engine/lib`.
+
+## Support VPal
+
+VPal is free and always will be. If you'd like to say thanks, you can leave a tip at **[ko-fi.com/vpalhq](https://ko-fi.com/vpalhq)**. It's never required, and every feature stays free.
 
 ## License and credits
 
