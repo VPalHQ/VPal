@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/vpal-logo.png" alt="VPal Server Command Center logo" width="260"></p>
+
 # VPal Server Command Center
 
 A free control panel for running a **Palworld dedicated server on your own Windows PC**, made for families and small groups of friends, including console players.

@@ -623,6 +623,7 @@ namespace VPalUi
         public Image Logo { get; set; }
         public string Title { get; set; }
         public string Subtitle { get; set; }
+        public Color SubtitleColor { get; set; }
         public string[] Groups { get; set; }
         public int LogoHeight { get; set; }
 
@@ -632,7 +633,8 @@ namespace VPalUi
                      | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             TabStop = true;
             Title = "VPal";
-            Subtitle = "Command Center";
+            Subtitle = "Server Command Center";
+            SubtitleColor = Theme.Gold;
             Groups = new string[] { "Server", "World settings" };
             LogoHeight = 100;
             Width = 240;
@@ -692,13 +694,40 @@ namespace VPalUi
             Theme.PaintBackdrop(this, e.Graphics, Theme.Alpha(Theme.Navy, 150));
         }
 
+        // Spaced capitals (like the logo's "SERVER COMMAND CENTER"), shrunk until they fit.
+        static void DrawCaps(Graphics g, string text, int x, int y, int width, Color color)
+        {
+            if (string.IsNullOrEmpty(text) || width <= 0) return;
+            TextFormatFlags f = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+            for (float size = 8.5f; size >= 6.5f; size -= 0.5f)
+            {
+                Font font = Theme.Font(size, FontStyle.Bold);
+                float track = size >= 8f ? 1.6f : 1.0f;
+                int[] w = new int[text.Length];
+                float total = 0;
+                for (int i = 0; i < text.Length; i++)
+                {
+                    w[i] = text[i] == ' ' ? (int)Math.Round(size * 0.55f) : TextRenderer.MeasureText(g, text[i].ToString(), font, new Size(200, 40), f).Width;
+                    total += w[i] + (i < text.Length - 1 ? track : 0);
+                }
+                if (total > width && size > 6.5f) continue;
+                float cx = x;
+                for (int i = 0; i < text.Length; i++)
+                {
+                    if (text[i] != ' ') TextRenderer.DrawText(g, text[i].ToString(), font, new Point((int)Math.Round(cx), y), color, f);
+                    cx += w[i] + track;
+                }
+                return;
+            }
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
             using (Pen edge = new Pen(Theme.Alpha(Theme.TealSoft, 45))) g.DrawLine(edge, Width - 1, 0, Width - 1, Height);
-            if (Logo != null) Theme.DrawIcon(g, Logo, new Rectangle(16, 22, 50, 50));
-            Theme.DrawText(g, Title, Theme.Font(21f, FontStyle.Bold), new Rectangle(72, 18, Width - 80, 38), Theme.Text, TextFormatFlags.VerticalCenter);
-            Theme.DrawText(g, Subtitle, Theme.Font(9.5f, FontStyle.Regular), new Rectangle(74, 54, Width - 80, 20), Theme.Muted, TextFormatFlags.VerticalCenter);
+            if (Logo != null) Theme.DrawIcon(g, Logo, new Rectangle(8, 14, 74, 74));
+            Theme.DrawText(g, Title, Theme.Font(22f, FontStyle.Bold), new Rectangle(84, 14, Width - 90, 42), Theme.Text, TextFormatFlags.VerticalCenter);
+            DrawCaps(g, (Subtitle ?? "").ToUpperInvariant(), 86, 58, Width - 86 - 10, SubtitleColor);
             Page selPage = host != null ? host.SelectedTab : null;
             for (int i = 0; i < items.Count; i++)
             {

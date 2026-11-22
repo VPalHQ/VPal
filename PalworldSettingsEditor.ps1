@@ -5160,7 +5160,7 @@ try {
     $nav.Width = 240
     $nav.Logo = [VPalUi.Theme]::Icon('vpal_v128')
     $nav.Title = 'VPal'
-    $nav.Subtitle = 'Command Center'
+    $nav.Subtitle = 'Server Command Center'
     $right = New-Object VPalUi.BackdropPanel
     $right.Dock = 'Fill'
 
