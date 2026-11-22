@@ -790,6 +790,7 @@ ul.rules{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;f
         </div>
         <nav class="tabs" aria-label="Sections">
           <a href="#pals" data-tab="pals">My Pals</a>
+          <a href="#ask" data-tab="ask">Ask</a>
           <a href="#crews" data-tab="crews">Crews</a>
           <a href="#breeding" data-tab="breeding">Breeding</a>
           <a href="#attack" data-tab="attack">Attack</a>
@@ -1121,13 +1122,367 @@ document.addEventListener('click', (e)=>{
   if (location.hash==='#map') route(); else location.hash = '#map';
 });
 
+// ---------- Ask ----------
+// Answers questions from VPal's own game data (askdata.json, made from the same Palworld tables as the rest of the
+// planner) and this player's save. There is no AI behind it: when the data can't answer, it says so.
+let ASK = null, ASKX = null, GAMEVER = '';
+const ASK_EXAMPLES = ['Where do I catch Anubis?', 'How do I breed Jetragon?', 'What do Penking and Bushi make?', 'Who are my best miners?',
+  'How do I make Ability Glasses?', 'Where do I get the Air Walker EX schematic?', 'What is Grizzbolt weak to?', 'Do I have a Lyleen?', 'What does Swift do?'];
+const ASK_WORK = [
+  ['Mining', /\b(min(e|es|er|ers|ing)|ore|stone)\b/], ['Lumbering', /\b(lumber(ing)?|logg(ing|er|ers)|wood(cutting)?|tree cutting)\b/],
+  ['Kindling', /\b(kindl(e|ing|er|ers)|smelt(ing|er)?|cook(ing|er|s)?)\b/], ['Watering', /\bwater(ing|er|ers)\b/],
+  ['Planting', /\b(plant(ing|er|ers)?|seed(ing|er)?|sow(ing)?)\b/], ['Generating Electricity', /\b(electricity|generat(ing|or|ors)|power(ing)?)\b/],
+  ['Handiwork', /\b(handiwork|craft(ing|er|ers)|build(ing|er|ers))\b/], ['Gathering', /\b(gather(ing|er|ers)?|harvest(ing|er|ers)?|berr(y|ies))\b/],
+  ['Medicine Production', /\bmedicine\b/], ['Cooling', /\b(cool(ing|er|ers)|refrigerat\w*|cold storage)\b/],
+  ['Transporting', /\b(transport(ing|er|ers)?|haul(ing|er|ers)?|carr(y|ying|ier|iers))\b/], ['Farming', /\b(farm(ing|er|ers)?|ranch(ing|er)?)\b/],
+  ['Crude Oil Extraction', /\b(crude|oil)\b/]];
+const ASK_ELS = ['Neutral','Fire','Water','Electric','Grass','Ground','Ice','Dragon','Dark'];
+const askNorm = (s)=>' ' + String(s||'').toLowerCase().replace(/[’‘`]/g, "'").replace(/'s\b/g, 's').replace(/[^a-z0-9+']+/g, ' ').replace(/'/g, '').trim() + ' ';
+
+async function askLoad(){
+  const need = [];
+  if (!ASK) need.push(fetch('askdata.json').then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(j=>{ ASK=j; ASKX=null; }));
+  if (!REC) need.push(fetch('recipes.json').then(r=>r.json()).then(j=>{ REC=j; ASKX=null; }).catch(()=>{}));
+  if (!SCH) need.push(fetch('schematics.json').then(r=>r.json()).then(j=>{ SCH=j; ASKX=null; }).catch(()=>{}));
+  need.push(fetch('live', {headers:{'X-Planner-Code':UNLOCK_CODE}, cache:'no-store'}).then(r=>r.ok?r.json():{}).then(j=>{ GAMEVER = String((j&&j.game)||''); }).catch(()=>{}));
+  await Promise.all(need);
+  if (!ASKX) askIndex();
+}
+
+// name lookups: every pal, item, schematic and passive, plus the player's own pals by kind
+function askIndex(){
+  const X = {pal:new Map(), item:new Map(), sch:new Map(), pas:new Map(), byId:new Map(), owned:new Map(), words:[]};
+  ASK.pals.forEach((p,i)=>{ X.pal.set(askNorm(p.n), i); X.byId.set(p.id.toLowerCase(), i); X.words.push([p.n,'pal']); });
+  if (REC){ for (const r of REC.recipes){ const k=askNorm(r.n); if (!X.item.has(k)) X.item.set(k, []); X.item.get(k).push(r); }
+    for (const [id,[n]] of Object.entries(REC.items)){ const k=askNorm(n); if (!X.item.has(k)) X.item.set(k, []); X.words.push([n,'item']); } }
+  if (SCH) for (const x of SCH.list){ for (const nm of [x.n, x.n+' schematic']){ const k=askNorm(nm); if (!X.sch.has(k)) X.sch.set(k, []); if (!X.sch.get(k).includes(x)) X.sch.get(k).push(x); } }
+  for (const n of Object.keys(ASK.passives)){ X.pas.set(askNorm(n), n); X.words.push([n,'passive']); }
+  for (const p of PALS){ const i = X.byId.get(String(p.species||'').toLowerCase()) ?? X.pal.get(askNorm(p.name)); if (i==null) continue; if (!X.owned.has(i)) X.owned.set(i, []); X.owned.get(i).push(p); }
+  for (const l of X.owned.values()) l.sort((a,b)=>b.lv-a.lv);
+  ASKX = X;
+}
+// every name of one kind in the question, longest first, without overlaps
+function askFind(map, q){
+  const hits = [];
+  for (const [k,v] of map){ let at = q.indexOf(k); while (at>=0){ hits.push({k, v, at, end:at+k.length}); at = q.indexOf(k, at+1); } }
+  hits.sort((a,b)=>(b.end-b.at)-(a.end-a.at) || a.at-b.at);
+  const out = [];
+  for (const h of hits) if (!out.some(o=>h.at<o.end-1 && o.at<h.end-1)) out.push(h);
+  return out.sort((a,b)=>a.at-b.at);
+}
+function askPair(a, b){
+  const n = ASK.pals.length, i = Math.min(a,b), j = Math.max(a,b);
+  const c = ASK.pairs.substr((i*n - i*(i-1)/2 + (j-i))*2, 2);
+  return c==='zz' ? -1 : parseInt(c, 36);
+}
+function askGendered(a, b){      // [[text, child index], ...] for the two pairs whose child depends on which parent is male
+  const A = ASK.pals[a].id, B = ASK.pals[b].id, out = [];
+  for (const [pa,ga,pb,gb,ch] of ASK.gendered){
+    const fit = (pa===A&&pb===B) ? [a,ga,b,gb] : (pa===B&&pb===A) ? [b,ga,a,gb] : null;
+    if (fit) out.push([`${ASK.pals[fit[0]].n} ${ga==='M'?'male':'female'} + ${ASK.pals[fit[2]].n} ${gb==='M'?'male':'female'}`, ASKX.byId.get(ch.toLowerCase())]);
+  }
+  return out;
+}
+const askCanMate = (p,q)=> p!==q && (!p.gender || !q.gender || p.gender!==q.gender);
+const askMine = (i)=> ASKX.owned.get(i) || [];
+const askPalLine = (p)=>`${esc(p.nick||p.name)}${p.nick?` <span class="muted">(${esc(p.name)})</span>`:''} <span class="muted">Lv ${p.lv}${genderSym(p.gender)}</span>`;
+function askPalRow(p, extra){
+  return `<div class="member">${palAvatar(p,32)}<div class="t" style="flex:1;min-width:0"><div class="nm" style="font-weight:600">${askPalLine(p)}</div>${extra?`<div class="ln" style="font-size:12px;color:var(--soft)">${extra}</div>`:''}<div class="ln" style="font-size:12px;color:var(--muted)">${esc(p.loc)}</div></div></div>`;
+}
+const askGo = (label, attrs)=>`<button type="button" class="btn" ${attrs} style="align-self:flex-start">${esc(label)}</button>`;
+const askAgain = (text)=>`<button type="button" class="chip" data-askq="${esc(text)}">${esc(text)}</button>`;
+function askCard(title, body, src){
+  return `<div class="card"><h3>${title}</h3>${body}<p class="meta" style="margin:0;font-size:12px;color:var(--muted)">${esc(src||`From Palworld ${ASK.game} game data`)}</p></div>`;
+}
+const fromSave = ()=>`From your save (${D.saved}) and Palworld ${ASK.game} game data`;
+
+// ---------- the answers ----------
+function askWhere(i){
+  const p = ASK.pals[i], w = whereToCatch(p.n);
+  const spots = ['main','tree'].flatMap(r=>areaGroups(p.n, r));
+  let body = '';
+  if (w.length){
+    const lo = Math.min(...spots.map(g=>g.lmin)), hi = Math.max(...spots.map(g=>g.lmax));
+    body += `<p class="meta" style="margin:0">${spots.length ? `Wild ${esc(p.n)} live in ${spots.length} area${spots.length===1?'':'s'}${isFinite(lo)?`, Lv ${lo}–${hi}`:''}. The busiest ones:` : 'No regular wild spawns, but:'}</p>${whereBlock(w)}`;
+  } else {
+    body += `<p class="meta" style="margin:0">${esc(p.n)} doesn’t live in the wild anywhere on the map.</p>`;
+    const g = (D.breeding&&D.breeding.goals||[]).find(x=>x.sid===p.id);
+    const get = g && (g.steps||[]).find(s=>s.kind==='get');
+    if (get) body += `<p class="meta" style="margin:0">${esc(get.text)}</p>`;
+    const boss = D.attack.find(a=>a.pal===p.n);
+    if (boss) body += `<p class="meta" style="margin:0">You can fight it: ${esc(boss.label)}${boss.where?' · '+esc(boss.where):''}.</p>`;
+  }
+  const mine = askMine(i).length;
+  body += `<div class="chips">${askAgain('How do I breed '+p.n+'?')}${mine?askAgain('Do I have a '+p.n+'?'):''}</div>`;
+  return askCard(`Where to catch ${esc(p.n)}`, body, `From the Palworld ${ASK.game} spawn map`);
+}
+
+function askBreed(t){
+  const P = ASK.pals, n = P.length, pairs = [];
+  for (let i=0;i<n;i++) for (let j=i;j<n;j++){
+    const c = askPair(i,j);
+    if (c===t) pairs.push([i,j,'']);
+    else if (c===-1) for (const [txt,ch] of askGendered(i,j)) if (ch===t) pairs.push([i,j,txt]);
+  }
+  const name = P[t].n;
+  if (!pairs.length) return askCard(`Breeding ${esc(name)}`, `<p class="meta" style="margin:0">No two pals make ${esc(name)} in Palworld ${ASK.game}. ${esc(name)} can only be caught or found.</p><div class="chips">${askAgain('Where do I catch '+name+'?')}</div>`);
+  const now = [], half = [], none = [];
+  for (const [a,b,g] of pairs){
+    const A = askMine(a), B = askMine(b);
+    let best = null;
+    for (const x of A){ for (const y of B){ if (askCanMate(x,y) && (!best || x.lv+y.lv > best[0].lv+best[1].lv)) best=[x,y]; } }
+    if (best) now.push({a,b,g,best}); else if (A.length||B.length) half.push({a,b,g,have:A.length?a:b, need:A.length?b:a}); else none.push({a,b,g});
+  }
+  const self = pairs.length===1 && pairs[0][0]===t && pairs[0][1]===t;
+  let body = `<p class="meta" style="margin:0">${self ? `Only two ${esc(name)} make a ${esc(name)}: one male, one female.` : `${pairs.length} different parent pair${pairs.length===1?'':'s'} make ${esc(name)}.`}</p>`;
+  if (now.length){
+    body += `<div class="kicker">You can breed it now</div>` + now.slice(0,3).map(x=>`<div style="display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line);padding-top:6px">${askPalRow(x.best[0])}${askPalRow(x.best[1])}${x.g?`<div class="meta" style="font-size:12px">Needs ${esc(x.g)}</div>`:''}</div>`).join('');
+  } else if (half.length){
+    const easy = half.map(x=>({...x, spots: areaGroups(P[x.need].n,'main').length + areaGroups(P[x.need].n,'tree').length})).sort((x,y)=>(y.spots>0)-(x.spots>0));
+    body += `<div class="kicker">You have one parent already</div>` + easy.slice(0,3).map(x=>`<div class="meta" style="margin:0;border-top:1px solid var(--line);padding-top:6px">Your ${esc(P[x.have].n)} (${askMine(x.have).map(p=>'Lv '+p.lv+genderSym(p.gender)).slice(0,2).join(', ')}) + a ${esc(P[x.need].n)}${x.g?` (needs ${esc(x.g)})`:''}. ${x.spots?'':' It isn’t in the wild, so breed or find that one first.'}</div>${x.spots?`<div class="chips">${askAgain('Where do I catch '+P[x.need].n+'?')}</div>`:''}`).join('');
+  } else {
+    const easy = none.map(x=>({...x, spots:[x.a,x.b].every(k=>areaGroups(P[k].n,'main').length+areaGroups(P[k].n,'tree').length>0)})).sort((x,y)=>y.spots-x.spots);
+    body += `<div class="kicker">You don’t own any of the parents yet</div>` + easy.slice(0,3).map(x=>`<div class="meta" style="margin:0;border-top:1px solid var(--line);padding-top:6px">${esc(P[x.a].n)} + ${esc(P[x.b].n)}${x.g?` (needs ${esc(x.g)})`:''}</div>`).join('');
+  }
+  if ((D.breeding&&D.breeding.goals||[]).some(g=>g.sid===P[t].id)) body += askGo('See your breeding plan for '+name, 'data-askgo="breeding"');
+  return askCard(`How to breed ${esc(name)}`, body, fromSave());
+}
+
+function askChild(a, b){
+  const P = ASK.pals, c = askPair(a,b);
+  const own = (i)=> askMine(i).length ? `you have ${askMine(i).length}` : 'you don’t have one';
+  let body;
+  if (c===-1){
+    body = `<p class="meta" style="margin:0">It depends on which parent is male:</p>` + askGendered(a,b).map(([txt,ch])=>`<div class="pal">${nameAvatar(P[ch].n, P[ch].e, 36)}<div class="t"><div class="nm">${esc(P[ch].n)}</div><div class="ln">${esc(txt)}</div></div></div>`).join('');
+  } else {
+    body = `<div class="pal">${nameAvatar(P[c].n, P[c].e, 44)}<div class="t"><div class="nm" style="font-size:17px">${esc(P[c].n)}</div><div class="ln">${P[c].e.map(esc).join(' · ')}</div></div></div>`;
+  }
+  let pair = null;
+  for (const x of askMine(a)) for (const y of askMine(b)) if (askCanMate(x,y) && (!pair || x.lv+y.lv>pair[0].lv+pair[1].lv)) pair=[x,y];
+  body += `<p class="meta" style="margin:0">${esc(P[a].n)}: ${own(a)} · ${esc(P[b].n)}: ${own(b)}.${pair?` You can put your ${esc(pair[0].nick||pair[0].name)} (Lv ${pair[0].lv}${genderSym(pair[0].gender)}) with your ${esc(pair[1].nick||pair[1].name)} (Lv ${pair[1].lv}${genderSym(pair[1].gender)}) in a Breeding Farm now.`:''}</p>`;
+  if (c>=0) body += `<div class="chips">${askAgain('Where do I catch '+P[c].n+'?')}${askAgain('What is '+P[c].n+' weak to?')}</div>`;
+  return askCard(`${esc(P[a].n)} + ${esc(P[b].n)}`, body, `From the Palworld ${ASK.game} breeding table`);
+}
+
+function askMatchups(els){
+  const B = ASK.beats, weak = [], resist = [];
+  for (const ae of ASK_ELS){ let m = 1; for (const de of els){ if ((B[ae]||[]).includes(de)) m*=2; else if ((B[de]||[]).includes(ae)) m*=0.5; } if (m>1) weak.push(ae); if (m<1) resist.push(ae); }
+  const strong = ASK_ELS.filter(x=>els.some(e=>(B[e]||[]).includes(x)));
+  return {weak, resist, strong};
+}
+function askWeak(i){
+  const p = ASK.pals[i], m = askMatchups(p.e);
+  let body = `<div class="chips">${p.e.map(e=>`<span class="badge">${esc(e)}</span>`).join('')}${m.weak.length?`<span class="badge gold">Weak to ${m.weak.map(esc).join(' and ')}</span>`:'<span class="badge">No elemental weakness</span>'}</div>
+    <p class="meta" style="margin:0">${m.weak.length?`${m.weak.join(' and ')} attacks do double damage to it.`:'No element does extra damage to it.'}${m.resist.length?` ${m.resist.join(' and ')} attacks only do half.`:''}${m.strong.length?` Its own ${p.e.join('/')} attacks hit ${m.strong.join(' and ')} pals hard.`:''}</p>`;
+  const fights = D.attack.filter(a=>a.pal===p.n);
+  for (const a of fights.slice(0,2)){
+    body += `<div style="border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:4px"><div class="kicker">${esc(a.group)}: ${esc(a.label)} · Lv ${a.lv}</div>${a.team.slice(0,3).map(t=>askPalRow(PALS[t.i], esc(t.note))).join('')}${askGo('Open this fight in Attack','data-askboss="'+esc(a.id)+'"')}</div>`;
+  }
+  if (!fights.length && m.weak.length){
+    const good = PALS.filter(q=>(q.elements||[]).some(e=>m.weak.includes(e))).sort((x,y)=>y.lv-x.lv).slice(0,3);
+    if (good.length) body += `<div class="kicker">Your strongest ${m.weak.join(' or ')} pals</div>` + good.map(q=>askPalRow(q)).join('');
+  }
+  return askCard(`${esc(p.n)}’s weaknesses`, body, fromSave());
+}
+
+function askOwned(i){
+  const p = ASK.pals[i], mine = askMine(i);
+  if (!mine.length) return askCard(`Your ${esc(p.n)}`, `<p class="meta" style="margin:0">You don’t have a ${esc(p.n)} in your party, Palbox or bases.</p><div class="chips">${askAgain('Where do I catch '+p.n+'?')}${askAgain('How do I breed '+p.n+'?')}</div>`, fromSave());
+  const body = `<p class="meta" style="margin:0">You have ${mine.length}.</p>` + mine.slice(0,6).map(q=>askPalRow(q, (q.passives||[]).map(x=>esc(x.n)).join(' · ') || 'No passives')).join('')
+    + (mine.length>6?`<p class="meta" style="margin:0">and ${mine.length-6} more</p>`:'') + askGo('Show them in My Pals', `data-askpals="${esc(p.n)}"`);
+  return askCard(`Your ${esc(p.n)}`, body, fromSave());
+}
+
+function askWorkers(w){
+  const bonus = (q)=>(q.passives||[]).reduce((s,x)=>s+({ 'Remarkable Craftsmanship':75, Artisan:50, 'Work Slave':30, Lucky:20, Serious:20, Conceited:10 }[x.n]||0),0);
+  const mine = PALS.filter(q=>(q.work||{})[w]).sort((x,y)=>(y.work[w]-x.work[w]) || (bonus(y)-bonus(x)) || (y.lv-x.lv));
+  let body = mine.length ? mine.slice(0,5).map(q=>askPalRow(q, `${esc(w)} Lv ${q.work[w]}${bonus(q)?` · ${(q.passives||[]).filter(x=>/Craftsmanship|Artisan|Work Slave|Lucky|Serious|Conceited/.test(x.n)).map(x=>esc(x.n)).join(', ')}`:''}`)).join('')
+    : `<p class="meta" style="margin:0">None of your pals can do ${esc(w)} yet.</p>`;
+  const ownedIds = new Set(ASKX.owned.keys());
+  const best = ASK.pals.map((p,i)=>({p,i,l:(p.w||{})[w]||0})).filter(x=>x.l && !ownedIds.has(x.i)).sort((x,y)=>y.l-x.l).slice(0,3);
+  if (best.length) body += `<div class="kicker">Strongest ${esc(w)} pals you don’t have yet</div><div class="chips">${best.map(x=>askAgain('Where do I catch '+x.p.n+'?').replace('</button>',` · Lv ${x.l}</button>`)).join('')}</div>`;
+  body += askGo('Open Crews', 'data-askgo="crews"');
+  return askCard(`Your best for ${esc(w)}`, body, fromSave());
+}
+
+function askPassive(name){
+  const x = ASK.passives[name], who = PALS.filter(q=>(q.passives||[]).some(y=>y.n===name)).sort((a,b)=>b.lv-a.lv);
+  const col = x.r>=3 ? '#f5c04e' : (x.r<0 ? '#ff9b8f' : 'var(--fg)');
+  let body = `<p class="meta" style="margin:0"><b style="color:${col}">${esc(name)}</b>: ${esc(x.d)}</p>
+    <p class="meta" style="margin:0">${x.r<0?'A bad passive: worth breeding off.':x.r>=3?'One of the best passives.':'A helpful passive.'}</p>`;
+  body += who.length ? `<div class="kicker">${who.length} of your pals have it</div>` + who.slice(0,5).map(q=>askPalRow(q)).join('') : `<p class="meta" style="margin:0">None of your pals have it.</p>`;
+  return askCard(`What ${esc(name)} does`, body, fromSave());
+}
+
+function askRecipe(list){
+  if (!recCache || recCache.key!==D.player+'|'+D.saved) recBuild();
+  const out = [];
+  for (const r of list.slice(0,2)){
+    const x = recCache.list.find(y=>y.r===r);
+    const where = r.k==='build' ? `Build menu${r.g?' · '+esc(r.g):''}` : (r.at||[]).map(st=>esc((REC.stations[st]||[st])[0])).join(' or ');
+    const mats = r.m.map(([id,n])=>{ const [b,c]=haveOf(id); return `<div class="kv"><span>${num(n)} ${esc(recItem(id))}</span><span class="${D.inv?(b+c>=n?'':'bad'):''}">${D.inv?`you have ${num(b+c)}`:''}</span></div>`; }).join('');
+    const body = `<p class="meta" style="margin:0">${r.k==='build'?'Built from the':'Made at'} ${where}.</p><div>${mats}</div>
+      ${x?x.have.map(t=>`<div class="meta" style="margin:0">✓ ${esc(t)}</div>`).join('')+x.need.map(t=>`<div class="meta" style="margin:0;color:var(--bad)">✗ ${esc(t)}</div>`).join(''):''}
+      ${askGo('Open in Recipes', `data-askrec="${esc(r.n)}"`)}`;
+    out.push(askCard(`How to make ${esc(r.n)}`, body, fromSave()));
+  }
+  return out.join('');
+}
+function askNotCrafted(name){
+  if (!recCache || recCache.key!==D.player+'|'+D.saved) recBuild();
+  const id = Object.keys(REC.items).find(k=>askNorm(REC.items[k][0])===askNorm(name));
+  const used = id ? (recCache.usedIn[id]||[]).map(i=>recCache.list[i].r.n) : [];
+  const [b,c] = id ? haveOf(id) : [0,0];
+  return askCard(esc(name), `<p class="meta" style="margin:0">${esc(name)} isn’t crafted, and VPal doesn’t list where it drops. You have ${num(b+c)}.</p>${used.length?`<p class="meta" style="margin:0">It’s used to make ${used.slice(0,6).map(esc).join(', ')}${used.length>6?` and ${used.length-6} more`:''}.</p>`:''}`, fromSave());
+}
+
+function askSchem(list){
+  if (!D.schem) return askCard('Schematics', `<p class="meta" style="margin:0">This planner was built before schematics were tracked. ${askOwner()} to click Refresh now.</p>`);
+  const {st} = schData();
+  const fam = list.slice().sort((a,b)=>a.t-b.t);
+  const body = fam.slice(0,4).map(x=>`<div style="border-top:1px solid var(--line);padding-top:6px;display:flex;flex-direction:column;gap:4px"><div><b>${esc(schName(x))}</b> ${st[x.id].own?`<span class="badge gold">You have it (${st[x.id].bag?'in your bag':'in a base chest'})</span>`:'<span class="badge">You don’t have it</span>'}</div>
+    ${st[x.id].own?'':x.s.slice(0,3).map(([k,c,note])=>`<div class="meta" style="margin:0;font-size:13px">${srcLine(k,c,note)}</div>`).join('')}</div>`).join('');
+  return askCard(`Where to get the ${esc(fam[0].n)} schematic`, body + askGo('Open in Schematics', `data-asksch="${esc(fam[0].n)}"`), fromSave());
+}
+
+function askElement(e, q){
+  const B = ASK.beats;
+  const beatenBy = ASK_ELS.filter(a=>(B[a]||[]).includes(e)), beats = B[e]||[];
+  return askCard(`${esc(e)} matchups`, `<p class="meta" style="margin:0">${esc(e)} pals take double damage from ${beatenBy.length?beatenBy.map(esc).join(' and '):'nothing'}. ${esc(e)} attacks do double damage to ${beats.length?beats.map(esc).join(' and '):'nothing'} pals.</p>`);
+}
+
+function askProfile(i){
+  const p = ASK.pals[i], m = askMatchups(p.e), mine = askMine(i);
+  const work = Object.entries(p.w||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} ${v}`).join(' · ') || 'No work skills';
+  const spots = ['main','tree'].flatMap(r=>areaGroups(p.n, r));
+  const body = `<div class="pal">${nameAvatar(p.n, p.e, 48)}<div class="t"><div class="nm" style="font-size:17px">${esc(p.n)}</div><div class="ln">${p.e.map(esc).join(' · ')}${m.weak.length?` · weak to ${m.weak.map(esc).join(' and ')}`:''}</div></div></div>
+    <p class="meta" style="margin:0"><b>Work:</b> ${work}</p>
+    <p class="meta" style="margin:0"><b>You have:</b> ${mine.length?`${mine.length} (best is Lv ${mine[0].lv})`:'none yet'} · <b>Wild:</b> ${spots.length?`${spots.length} area${spots.length===1?'':'s'}`:'not in the wild'}</p>
+    <div class="chips">${askAgain('Where do I catch '+p.n+'?')}${askAgain('How do I breed '+p.n+'?')}${askAgain('What is '+p.n+' weak to?')}${mine.length?askAgain('Do I have a '+p.n+'?'):''}</div>`;
+  return askCard(esc(p.n), body, fromSave());
+}
+
+// closest names for a typo: "Did you mean"
+function askLev(a, b){
+  if (Math.abs(a.length-b.length) > 2) return 9;
+  const d = Array.from({length:a.length+1}, (_,i)=>[i].concat(Array(b.length).fill(0)));
+  for (let j=1;j<=b.length;j++) d[0][j]=j;
+  for (let i=1;i<=a.length;i++) for (let j=1;j<=b.length;j++){
+    d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    if (i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1);
+  }
+  return d[a.length][b.length];
+}
+function askSuggest(q){
+  const intent = / (where|catch|breed|breeding|make|craft|build|weak|beat|have|does|best|find|get|schematic|recipe|passive|pal|pals) /.test(q);
+  if (!intent && q.trim().split(' ').length > 3) return [];
+  const words = q.trim().split(' ').filter(w=>w.length>=4 && !/^(where|what|which|catch|breed|does|have|make|craft|best|find|with|weak|from|good|that|this|there|they|their|about|should)$/.test(w));
+  const out = new Map();
+  for (const [name,kind] of ASKX.words){
+    const nn = askNorm(name).trim(); if (nn.length<4) continue;
+    for (let k=0;k<words.length;k++){
+      for (const w of [words[k], words.slice(k,k+2).join(' ')]){
+        if (w[0]!==nn[0]) continue;
+        const lim = nn.length>=7 ? 2 : 1, d = askLev(w, nn);
+        if (d<=lim && (!out.has(name) || out.get(name).d>d)) out.set(name, {d, w, kind});
+      }
+    }
+  }
+  return [...out.entries()].sort((a,b)=>a[1].d-b[1].d).slice(0,4).map(([name,v])=>({name, ...v}));
+}
+
+function askAnswer(raw){
+  const q = askNorm(raw);
+  const pas = askFind(ASKX.pas, q), items = askFind(ASKX.item, q), schs = askFind(ASKX.sch, q);
+  const inside = (h)=>items.concat(schs, pas).some(o=>o.at<=h.at && h.end<=o.end && (o.end-o.at)>(h.end-h.at));
+  let pals = askFind(ASKX.pal, q).filter(h=>!inside(h));
+  if (!pals.length && !items.length && !schs.length && !pas.length) pals = askFind(ASKX.pal, q.replace(/ ([a-z]{4,}?)(es|s) /g, ' $1 ')).concat(askFind(ASKX.pal, q.replace(/ ([a-z]{4,})s /g, ' $1 '))).filter((h,k,a)=>a.findIndex(o=>o.v===h.v)===k);
+  const has = (re)=>re.test(q);
+  const workHit = ASK_WORK.find(([,re])=>re.test(q));
+  const pal = pals[0] && pals[0].v;
+  // two pals: what do they make
+  if (pals.length>=2 && (has(/ (and|\+|x|with|plus|by) /) || has(/ (make|makes|breed|baby|child|egg|give|get|produce)/))) return askChild(pals[0].v, pals[1].v);
+  if (pal!=null && has(/ (breed|breeding|bred|parents?|egg|eggs|combo|combination) /)) return askBreed(pal);
+  if (pal!=null && has(/ (where|find|catch|caught|spawn|spawns|location|locate|habitat|live|lives|hunt|tame) /)) return askWhere(pal);
+  if (pal!=null && has(/ (weak|weakness|weaknesses|beat|defeat|counter|fight|kill|effective|strong against|resist) /)) return askWeak(pal);
+  if (pal!=null && has(/ (do i have|have i got|how many|own|my) /)) return askOwned(pal);
+  if (workHit && !pal && has(/ (best|good|top|strong|who|which|should|worker|workers|for|my) /)) return askWorkers(workHit[0]);
+  if (pas.length && !pal) return askPassive(pas[0].v);
+  if (schs.length && (has(/ schematic/) || !items.length)) return askSchem(schs[0].v);
+  if (items.length && !pal){
+    const recs = items.map(h=>h.v.filter(r=>r)).flat(), named = items[0].k;
+    const exact = recs.filter(r=>askNorm(r.n)===named);
+    if (exact.length || recs.length) return askRecipe(exact.length?exact:recs);
+    return askNotCrafted(items[0].k.trim());
+  }
+  if (pal!=null && has(/ (get|obtain|acquire) /)) return askWhere(pal) + askBreed(pal);
+  const el = ASK_ELS.find(e=>q.includes(' '+e.toLowerCase()+' '));
+  if (el && !pal && has(/ (weak|strong|beat|beats|effective|against|counter|matchup|matchups) /)) return askElement(el, q);
+  if (pal!=null) return askProfile(pal);
+  if (workHit) return askWorkers(workHit[0]);
+  const sug = askSuggest(q);
+  if (sug.length) return askCard('Did you mean…', `<p class="meta" style="margin:0">I couldn’t find a name in that question. Did you mean one of these?</p><div class="chips">${sug.map(s=>askAgain(String(raw).replace(new RegExp(s.w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'), s.name))).join('')}</div>`);
+  return askCard('I can’t answer that one', `<p class="meta" style="margin:0">The Ask tab only knows Palworld: catching, breeding, your pals, workers, crafting, schematics, weaknesses and passives. Try one of these:</p><div class="chips">${ASK_EXAMPLES.slice(0,5).map(askAgain).join('')}</div>`);
+}
+
+function askNewer(){
+  const v = (s)=>(String(s).match(/(\d+)\.(\d+)\.(\d+)/)||[]).slice(1).map(Number);
+  const g = v(GAMEVER), d = v(ASK.game);
+  if (g.length<3 || d.length<3) return false;
+  for (let k=0;k<3;k++){ if (g[k]!==d[k]) return g[k]>d[k]; }
+  return false;
+}
+let askHist = [];
+function renderAsk(){
+  const head = `<div><h2>Ask</h2><p class="sub">Questions about pals, breeding, catching, crafting, schematics and fights. Answers come from the game’s own data and your save, so they’re never made up.</p></div>`;
+  if (!ASK || !ASKX){
+    $('#view').innerHTML = head + `<div class="empty">Loading…</div>`;
+    askLoad().then(()=>{ if (location.hash==='#ask') renderAsk(); }).catch(()=>{ if (location.hash==='#ask') $('#view').innerHTML = head + `<div class="card"><p class="meta" style="margin:0">Couldn’t load the Ask data. Check your connection and open this tab again.</p></div>`; });
+    return;
+  }
+  if (!askHist.length){ try { askHist = JSON.parse(store.get('vega-ask-'+D.player)||'[]'); } catch(e){ askHist = []; } }
+  const newer = askNewer();
+  $('#view').innerHTML = head + `
+    <form class="row" id="askf" role="search" style="flex-wrap:nowrap"><input type="search" id="askq" placeholder="e.g. How do I breed Anubis?" aria-label="Your question" style="flex:1 1 auto" autocomplete="off" enterkeyhint="search" maxlength="200"><button class="btn primary" type="submit">Ask</button></form>
+    ${newer?`<div class="card" style="border-color:var(--bad)"><p class="meta" style="margin:0"><b style="color:var(--bad)">Heads up:</b> your server runs Palworld ${esc(GAMEVER)}, and these answers come from ${esc(ASK.game)} game data. Anything the update changed may be out of date until VPal updates its data.</p></div>`
+      :`<p class="meta" style="margin:0;font-size:12px;color:var(--muted)">Game data: Palworld ${esc(ASK.game)}${GAMEVER?` · your server runs ${esc(GAMEVER)}`:''} · your save: ${esc(D.saved)}</p>`}
+    <div id="aska" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div id="askrecent">${askRecent()}</div>
+    <p class="foot">Answers use the Palworld ${esc(ASK.game)} game tables (Palworld Atlas Data, MIT; Arkive by Yihao Liu, CC BY-NC 4.0; breeding tables from Palworld Save Pal, GPL-3.0) and your own save. Palworld and its game data belong to Pocketpair.</p>`;
+  $('#askf').addEventListener('submit', (e)=>{ e.preventDefault(); askRun($('#askq').value); });
+}
+function askRecent(){
+  return `<div class="kicker" style="margin-bottom:6px">${askHist.length?'Your recent questions':'Try asking'}</div><div class="chips">${(askHist.length?askHist:ASK_EXAMPLES).map(askAgain).join('')}</div>`;
+}
+function askRun(text){
+  text = String(text||'').trim().slice(0,200); if (!text || !$('#aska')) return;
+  $('#askq').value = text;
+  let html; try { html = askAnswer(text); } catch(e){ html = askCard('Something went wrong', `<p class="meta" style="margin:0">That question tripped up the Ask tab. Try asking it another way.</p>`); }
+  $('#aska').innerHTML = `<div class="kicker">${esc(text)}</div>` + html;
+  askHist = [text].concat(askHist.filter(x=>x.toLowerCase()!==text.toLowerCase())).slice(0,6);
+  store.set('vega-ask-'+D.player, JSON.stringify(askHist));
+  const rc = $('#askrecent'); if (rc) rc.innerHTML = askRecent();
+  $('#aska').scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', (e)=>{
+  if (location.hash!=='#ask') return;
+  const b = e.target.closest('[data-askq],[data-askgo],[data-askpals],[data-askrec],[data-asksch],[data-askboss]'); if (!b) return;
+  e.preventDefault();
+  if (b.dataset.askq){ askRun(b.dataset.askq); return; }
+    if (b.dataset.askgo){ location.hash = '#'+b.dataset.askgo; return; }
+    if (b.dataset.askpals){ ui.palQuery = b.dataset.askpals; ui.palFilter = 'all'; ui.palShown = 30; location.hash = '#pals'; return; }
+    if (b.dataset.askrec){ ui.recQ = b.dataset.askrec; ui.recCat = 'all'; ui.recShown = 30; ui.recOpen = null; location.hash = '#recipes'; return; }
+    if (b.dataset.asksch){ const x = SCH && SCH.list.find(y=>y.n===b.dataset.asksch); ui.schQ = b.dataset.asksch; ui.schView = 'item'; ui.schCat = 'all'; if (x) ui.schOpen[x.c+'|'+x.n] = true; location.hash = '#schem'; return; }
+    if (b.dataset.askboss){ const a = D.attack.find(x=>x.id===b.dataset.askboss); if (a){ ui.atkCat = atkCat(a); if (ui.atkCat==='arena') ui.arenaRank = arenaRank(a); ui.atkQ=''; ui.boss = a.id; } location.hash = '#attack'; }
+});
+
 // ---------- router ----------
 function route(){
   const tab = (location.hash||'#pals').slice(1);
-  const valid = ['pals','crews','breeding','attack','schem','recipes','map','voice'].concat(D.base?['base']:[]);
+  const valid = ['pals','ask','crews','breeding','attack','schem','recipes','map','voice'].concat(D.base?['base']:[]);
   const t = valid.includes(tab) ? tab : 'pals';
   document.querySelectorAll('nav.tabs a').forEach(a=>a.setAttribute('aria-current', a.dataset.tab===t?'page':'false'));
-  ({pals:renderPals, crews:renderCrews, breeding:renderBreeding, attack:renderAttack, schem:renderSchem, recipes:renderRecipes, map:renderMap, base:renderBase, voice:renderVoice})[t]();
+  ({pals:renderPals, ask:renderAsk, crews:renderCrews, breeding:renderBreeding, attack:renderAttack, schem:renderSchem, recipes:renderRecipes, map:renderMap, base:renderBase, voice:renderVoice})[t]();
   window.scrollTo(0,0);
 }
 

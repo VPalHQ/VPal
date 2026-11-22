@@ -6,7 +6,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 !define APP "VPal Server Command Center"
-!define VER "0.5.2"
+!define VER "0.5.3"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\VPal"
 
 Name "${APP}"
@@ -15,7 +15,7 @@ InstallDir "C:\VPal"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "VPal ${VER} (beta). Unofficial, not affiliated with Pocketpair."
-VIProductVersion "0.5.2.0"
+VIProductVersion "0.5.3.0"
 VIAddVersionKey "ProductName" "${APP}"
 VIAddVersionKey "FileDescription" "${APP} setup"
 VIAddVersionKey "FileVersion" "${VER}"

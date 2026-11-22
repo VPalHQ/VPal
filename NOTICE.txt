@@ -73,6 +73,8 @@ Parts made by others (their licenses are in the folders named)
   Palworld Atlas data ...... MIT (PalPlanner\engine\licenses)
   PalDex data .............. MIT (PalPlanner\engine\licenses)
   PalworldSavePal data ..... GPL-3.0 (PalPlanner\engine\licenses), breeding tables
+  Arkive game tables ....... CC BY-NC 4.0, non-commercial (PalPlanner\engine\licenses), by
+                             Yihao Liu (tc-imba): recipes, technology, schematic drops, map data
   Leaflet (map) ............ BSD-2-Clause, loaded from cdnjs when the planner opens
   Pal and item pictures .... loaded from PalWaypoint; the artwork is Pocketpair's
 VPal's own files (.ps1, .py, .html) are included as readable source code.

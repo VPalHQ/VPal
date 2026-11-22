@@ -18,6 +18,7 @@ A free control panel for running a **Palworld dedicated server on your own Windo
 - **Players.** Who is online and everyone who has played, with playtime, plus kick, ban and a whitelist.
 - **Discord bot.** Alerts in a channel you pick and slash commands (`/status`, `/players`, `/restart` and more). Free: you create the bot yourself and the control panel walks you through it.
 - **Pal Planner.** A private website for your players with their own pals, breeding paths, a live map and a voice-chat button, each locked with the player's own code.
+- **Ask.** Players type questions like "How do I breed Jetragon?" or "Who are my best miners?" and get answers from the game's own data and their own save. No AI and nothing made up, and it warns if the game has updated past VPal's data.
 - **One-click updates** for VPal itself. The game server keeps running while VPal updates.
 
 ## Download
@@ -70,6 +71,9 @@ VPal is free software under the [GNU General Public License v3.0](LICENSE).
 | palsav, from PalworldSaveTools | MIT |
 | Palworld Atlas data, PalDex data | MIT |
 | PalworldSavePal data (breeding tables) | GPL-3.0 |
+| Arkive game tables by Yihao Liu (tc-imba): recipes, technology, schematic drops and some map data | CC BY-NC 4.0 (non-commercial) |
 | Leaflet (map) | BSD-2-Clause |
 
 Their license files are in `PalPlanner/engine/licenses`. Pal and item artwork is Pocketpair's.
+
+VPal's own code is GPL-3.0. The game data files keep their own licenses, and the Arkive-based data may only be used non-commercially. That's one reason VPal is free: tips are optional and never unlock anything.

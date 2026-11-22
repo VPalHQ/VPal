@@ -14,5 +14,7 @@ What is in here
   status.json    Result of the last update (shown on the Pal Planner tab).
   refresh-log.txt  What happened on each update, if something goes wrong.
 
-Credits and licenses for the game data and the save reader are in engine\licenses.
+Credits and licenses for the game data and the save reader are in engine\licenses. Some game data
+(recipes, technology, schematic drops, map data) is based on Arkive by Yihao Liu (tc-imba), CC BY-NC 4.0:
+non-commercial use only.
 Unofficial fan tool. Not affiliated with Pocketpair.

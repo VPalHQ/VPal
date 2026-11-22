@@ -6,7 +6,7 @@ DATA = os.path.join(CC_DIR, 'data')
 WEB = os.path.join(CC_DIR, 'web')
 IS_WIN = os.name == 'nt'
 PORT = 18770                      # this PC only (127.0.0.1)
-VERSION = '0.5.2'
+VERSION = '0.5.3'
 
 os.makedirs(DATA, exist_ok=True)
 _lock = threading.RLock()

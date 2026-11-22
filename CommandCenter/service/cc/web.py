@@ -64,7 +64,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 try: x, y = float(p.get('location_x')), float(p.get('location_y'))
                 except (TypeError, ValueError): continue
                 out.append({'name': p.get('name', ''), 'level': p.get('level'), 'gx': round((y - TY) / SC), 'gy': round((x + TX) / SC)})
-            return {'t': round(time.time()), 'state': s.status.get('state'), 'players': out}
+            return {'t': round(time.time()), 'state': s.status.get('state'), 'players': out,
+                    'game': s.status.get('gameVersion') or ''}          # the Ask tab warns if the game is newer than its data
         if path == 'discord':
             c = discord.load()
             r = discord.public(c)
