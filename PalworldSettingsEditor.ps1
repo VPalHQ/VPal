@@ -32,10 +32,53 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+# ---------------- The Command Center look ----------------
+# CommandCenter\service\ui holds the night scene, the icons and VPalUi.cs (the custom-drawn controls). VPalUi.cs is
+# compiled once with the C# compiler that comes with Windows, and the result is kept in CommandCenter\data\ui.
+$UiDir = Join-Path $ServerDir 'CommandCenter\service\ui'
+function Import-VPalUi {
+    if ('VPalUi.Theme' -as [type]) { return }
+    $code = [System.IO.File]::ReadAllText((Join-Path $UiDir 'VPalUi.cs'))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($code + '|' + [string][Environment]::Version))
+    $hash = -join ($bytes[0..7] | ForEach-Object { $_.ToString('x2') })
+    $cacheDir = Join-Path $ServerDir 'CommandCenter\data\ui'
+    $dll = Join-Path $cacheDir ('VPalUi-' + $hash + '.dll')
+    $refs = @('System.Windows.Forms', 'System.Drawing')
+    if (Test-Path -LiteralPath $dll) {
+        try { Add-Type -Path $dll; return } catch { }
+    }
+    try {
+        [void](New-Item -ItemType Directory -Force -Path $cacheDir)
+        Add-Type -TypeDefinition $code -ReferencedAssemblies $refs -OutputAssembly $dll -OutputType Library
+        if (-not ('VPalUi.Theme' -as [type])) { Add-Type -Path $dll }
+        Get-ChildItem -LiteralPath $cacheDir -Filter 'VPalUi-*.dll' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -ne $dll } | Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+    catch {
+        # the cache folder can't be written: build it in memory instead
+        if (-not ('VPalUi.Theme' -as [type])) { Add-Type -TypeDefinition $code -ReferencedAssemblies $refs }
+    }
+}
+try {
+    Import-VPalUi
+    [VPalUi.Theme]::LoadAssets($UiDir)
+}
+catch {
+    [void][System.Windows.Forms.MessageBox]::Show(("VPal couldn't load its look from CommandCenter\service\ui.`r`n`r`n" + $_.Exception.Message +
+        "`r`n`r`nDownload VPal-Setup.exe from VPal's GitHub page and run it again to repair it. Your server and settings stay as they are."),
+        'VPal Server Command Center', 'OK', 'Error')
+    exit 1
+}
+
 $Inv = [System.Globalization.CultureInfo]::InvariantCulture
 $script:IniEncoding = New-Object System.Text.UTF8Encoding($false)
 $script:Rows  = New-Object System.Collections.Generic.List[object]
 $script:Model = $null
+$script:Defaults = @{}
+$script:ServerTitle = 'Palworld'
+$script:PlayersOnline = $null
+$script:PlayerTick = 0
 $script:Busy  = $false
 $script:StartRequestedAt = $null
 $script:LastSeenRunning  = $null
@@ -189,7 +232,7 @@ Add-Setting 'ServerDescription' 'Server' 'Text' 'Server description' 'Shown when
 Add-Setting 'ServerPassword' 'Server' 'Text' 'Join password' 'Password friends enter to join. Everyone needs the new one if you change it.'
 Add-Setting 'AdminPassword' 'Server' 'Raw' 'Admin password' 'Locked: StopServer, the restarts and the welcome message all use it.' -Locked -Mask
 Add-Setting 'CrossplayPlatforms' 'Server' 'Raw' 'Crossplay platforms' 'Locked: PS5 and Xbox must stay in it.' -Locked
-Add-Setting 'PublicPort' 'Server' 'Raw' 'Public port' 'Locked: must match your eero port forwarding.' -Locked
+Add-Setting 'PublicPort' 'Server' 'Raw' 'Public port' 'Locked: must match the port forwarding on your router.' -Locked
 Add-Setting 'PublicIP' 'Server' 'Raw' 'Public IP' 'Locked: blank means detect automatically.' -Locked
 Add-Setting 'RESTAPIEnabled' 'Server' 'Raw' 'REST API' 'Locked: StopServer, the restarts, the welcome message and this editor need it.' -Locked
 Add-Setting 'RESTAPIPort' 'Server' 'Raw' 'REST API port' 'Locked: never port-forward this one.' -Locked
@@ -335,13 +378,16 @@ function Wait-UI([int]$Milliseconds) {
 $FontMain     = New-Object System.Drawing.Font('Segoe UI', 9)
 $FontBold     = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $FontSmall    = New-Object System.Drawing.Font('Segoe UI', 8.25)
-$ColorChanged = [System.Drawing.Color]::FromArgb(214, 102, 0)
-$ColorNormal  = [System.Drawing.SystemColors]::ControlText
-$ColorDesc    = [System.Drawing.Color]::FromArgb(100, 100, 100)
-$ColorLocked  = [System.Drawing.Color]::FromArgb(150, 150, 150)
-$ColorOn       = [System.Drawing.Color]::FromArgb(30, 150, 60)
-$ColorStarting = [System.Drawing.Color]::FromArgb(220, 150, 0)
-$ColorOff      = [System.Drawing.Color]::FromArgb(200, 50, 45)
+$FontName     = New-Object System.Drawing.Font('Segoe UI', 11.5, [System.Drawing.FontStyle]::Bold)
+$FontDesc     = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$ColorChanged = [VPalUi.Theme]::Orange
+$ColorNormal  = [VPalUi.Theme]::Text
+$ColorDesc    = [VPalUi.Theme]::Muted
+$ColorLocked  = [VPalUi.Theme]::Faint
+$ColorOn       = [VPalUi.Theme]::Green
+$ColorStarting = [VPalUi.Theme]::Gold
+$ColorOff      = [VPalUi.Theme]::Red
+$ColorClear    = [System.Drawing.Color]::Transparent
 
 # ---------------- Row logic ----------------
 function Get-RowNewRaw($row) {
@@ -392,36 +438,322 @@ function Update-ChangeCount {
         $lblChanges.Text = "$n unsaved changes"
         $lblChanges.ForeColor = $ColorChanged
     }
+    if ($null -ne $chgDot) {
+        if ($n -eq 0) { $chgDot.DotColor = [VPalUi.Theme]::Faint } else { $chgDot.DotColor = $ColorChanged }
+    }
 }
 
 function Update-RowLook($row) {
-    if (Test-RowChanged $row) {
-        $row.NameLabel.ForeColor = $ColorChanged
-        $row.NameLabel.Text = $row.Meta.Label + '   (changed - not saved yet)'
-    }
-    else {
-        $row.NameLabel.ForeColor = $ColorNormal
-        $row.NameLabel.Text = $row.Meta.Label
-    }
+    $changed = Test-RowChanged $row
+    if ($changed) { $row.NameLabel.ForeColor = $ColorChanged }
+    elseif ($row.Kind -eq 'Raw') { $row.NameLabel.ForeColor = $ColorLocked }
+    else { $row.NameLabel.ForeColor = $ColorNormal }
+    if ($null -ne $row.Badge) { $row.Badge.Visible = $changed }
+    if ($null -ne $row.Stepper) { $row.Stepper.Changed = $changed }
     Update-ChangeCount
 }
 
+# ---------------- Pages ----------------
+# Sidebar group, icon, sidebar name and the line under the title, for every page.
+$PageInfo = @{
+    'Progression'        = @{ Icon = 'progression'; Sub = 'Level up, catch and hatch at your pace.' }
+    'Resources'          = @{ Icon = 'resources';   Sub = 'How much you gather and loot.' }
+    'Base'               = @{ Icon = 'base';        Sub = 'Bases, building limits and how fast your Pals work.' }
+    'Survival'           = @{ Icon = 'survival';    Sub = 'Hunger, stamina, healing, weight and the day and night.' }
+    'Combat'             = @{ Icon = 'combat';      Sub = 'Damage, death penalties and respawning.' }
+    'World'              = @{ Icon = 'world';       Sub = 'Wild Pals, bosses, raids and supply drops.' }
+    'Offline and Guilds' = @{ Icon = 'guilds';      Sub = 'What happens while people are away, and guild rules.'; Nav = 'Offline & Guilds' }
+    'Players and Travel' = @{ Icon = 'travel';      Sub = 'Player limits, fast travel, chat and voice.'; Nav = 'Players & Travel' }
+    'PvP'                = @{ Icon = 'pvp';         Sub = 'Player-versus-player rules.' }
+    'Performance'        = @{ Icon = 'performance'; Sub = 'Keeps the server smooth: loose items, autosaves and cleanup.' }
+    'Server'             = @{ Icon = 'server';      Sub = 'Name, passwords and connection settings.' }
+    'Other'              = @{ Icon = 'other';       Sub = 'Settings in your file that this editor does not explain yet.' }
+    'Watchdog'           = @{ Icon = 'watchdog';    Sub = 'Keeps your world running, backed up and up to date.'; Order = 0 }
+    'Players'            = @{ Icon = 'players';     Sub = 'Who is online, who has played, kicks, bans and the whitelist.'; Order = 1 }
+    'Backups'            = @{ Icon = 'backups';     Sub = 'World backups, and restoring one safely.'; Order = 2 }
+    'Messages'           = @{ Icon = 'messages';    Sub = 'The welcome message, and announcements to everyone online.'; Order = 3 }
+    'Discord'            = @{ Icon = 'discord';     Sub = 'Alerts and slash commands in your Discord server.'; Order = 4 }
+    'Pal Planner'        = @{ Icon = 'planner';     Sub = 'Your players'' own private Pal website.'; Order = 5 }
+}
+
+# Camp notes: a few true, useful things about each settings page (icon: info, peak or warn).
+$CampNotes = @{
+    'Progression'        = @(@('info', 'XP rate changes how fast both players and Pals level up.'),
+                             @('peak', 'The level cap stays at 80, whatever the XP rate.'))
+    'Resources'          = @(@('info', 'Gathering amount changes trees, rocks and ore nodes, not base pits.'),
+                             @('peak', 'Tree and rock HP and respawn are best left at 1.'))
+    'Base'               = @(@('info', 'Base work speed makes each cycle finish sooner; the amount per cycle stays the same.'),
+                             @('peak', 'More Pals per base means more lag. The most is 50.'))
+    'Survival'           = @(@('info', 'Day speed and night speed: higher means shorter days or nights.'),
+                             @('info', 'Item weight at 0 makes everything weightless.'))
+    'Combat'             = @(@('info', 'Death penalty None drops nothing. All also drops the Pals in your team.'),
+                             @('warn', 'Lose Pals on death and Friendly fire are best kept off for family servers.'))
+    'World'              = @(@('info', 'Wild Pal spawns at 2 doubles up the bosses, with more hitching while flying.'),
+                             @('peak', 'Leave the difficulty preset at None. Your own settings decide.'))
+    'Offline and Guilds' = @(@('warn', 'Auto-delete inactive guilds deletes bases and base Pals. Keep it off.'),
+                             @('info', 'Log off at your base: your character sleeps where it is.'))
+    'Players and Travel' = @(@('info', 'Up to 32 players can be online at once.'),
+                             @('info', 'PlayStation party chat is separate from the in-game voice chat setting.'))
+    'PvP'                = @(@('warn', 'PvP turns off missions, and rival guilds can open your chests.'),
+                             @('info', 'PvP needs Player vs player damage and Base Pals defend on as well.'))
+    'Performance'        = @(@('info', 'A lower Pal tracking distance gives consoles less to draw.'),
+                             @('peak', 'Keep World backups on.'))
+    'Server'             = @(@('warn', 'Never forward port 8212 (the REST API) on your router.'),
+                             @('info', 'Locked settings are ones VPal''s restarts and messages depend on.'))
+}
+
+# Colorful icon for each setting (art in CommandCenter\service\ui\icons), and one per page for the rest.
+$SettingIcons = @{
+    ExpRate = 'star'; PalCaptureRate = 'target'; PalEggDefaultHatchingTime = 'egg'
+    bAllowEnhanceStat_Health = 'heart'; bAllowEnhanceStat_Attack = 'sword'; bAllowEnhanceStat_Stamina = 'bolt'
+    bAllowEnhanceStat_Weight = 'backpack'; bAllowEnhanceStat_WorkSpeed = 'hammer'
+    CollectionDropRate = 'tree'; CollectionObjectHpRate = 'rock'; CollectionObjectRespawnSpeedRate = 'leaf'; EnemyDropItemRate = 'bag'
+    WorkSpeedRate = 'gear'; MonsterFarmActionSpeedRate = 'barn'; BaseCampWorkerMaxNum = 'paw'; BaseCampMaxNumInGuild = 'house'
+    BaseCampMaxNum = 'house'; MaxBuildingLimitNum = 'box'; MaxBuildingLimitNumPerPlayer = 'box'; BuildObjectHpRate = 'castle'
+    BuildObjectDamageRate = 'shield'; BuildObjectDeteriorationDamageRate = 'hourglass'; bBuildAreaLimit = 'map'
+    bAllowEnemyCampSpawnNearBaseCamp = 'tent'; bEnableBuildingPlayerUIdDisplay = 'eye'
+    PlayerStomachDecreaceRate = 'drumstick'; PalStomachDecreaceRate = 'drumstick'; PlayerStaminaDecreaceRate = 'bolt'
+    PalStaminaDecreaceRate = 'bolt'; PlayerAutoHPRegeneRate = 'heal'; PlayerAutoHpRegeneRateInSleep = 'zzz'
+    PalAutoHPRegeneRate = 'heal'; PalAutoHpRegeneRateInSleep = 'zzz'; ItemWeightRate = 'backpack'
+    EquipmentDurabilityDamageRate = 'wrench'; ItemCorruptionMultiplier = 'hourglass'; FishingDifficultyRate = 'fish'
+    DayTimeSpeedRate = 'sun'; NightTimeSpeedRate = 'moon'
+    PlayerDamageRateAttack = 'sword'; PlayerDamageRateDefense = 'shield'; PalDamageRateAttack = 'swords'; PalDamageRateDefense = 'shield'
+    DeathPenalty = 'skull'; bPalLost = 'skull'; BlockRespawnTime = 'clock'; RespawnPenaltyTimeScale = 'hourglass'
+    RespawnPenaltyDurationThreshold = 'clock'; bHardcore = 'skull'; bCharacterRecreateInHardcore = 'people'; bEnableFriendlyFire = 'swords'
+    PalSpawnNumRate = 'paw'; EnablePredatorBossPal = 'flame'; bEnableInvaderEnemy = 'castle'; SupplyDropSpan = 'box'
+    RandomizerType = 'dice'; RandomizerSeed = 'dice'; bIsRandomizerPalLevelRandom = 'dice'; Difficulty = 'gauge'
+    bExistPlayerAfterLogout = 'zzz'; bEnableNonLoginPenalty = 'hourglass'; bAutoResetGuildNoOnlinePlayers = 'ban'
+    AutoResetGuildTimeNoOnlinePlayers = 'clock'; GuildPlayerMaxNum = 'people'; GuildRejoinCooldownMinutes = 'clock'
+    AutoTransferMasterThresholdDays = 'crown'; AutoTransferMasterCheckIntervalSeconds = 'crown'; MaxGuildsPerFrame = 'gauge'
+    ServerPlayerMaxNum = 'people'; bEnableFastTravel = 'map'; bEnableFastTravelOnlyBaseCamp = 'house'; bIsStartLocationSelectByMap = 'compass'
+    bShowPlayerList = 'people'; bIsShowJoinLeftMessage = 'chat'; ChatPostLimitPerMinute = 'chat'; bEnableVoiceChat = 'mic'
+    VoiceChatMaxVolumeDistance = 'mic'; VoiceChatZeroVolumeDistance = 'mic'; bEnableAimAssistPad = 'target'; bEnableAimAssistKeyboard = 'target'
+    bAllowGlobalPalboxExport = 'save'; bAllowGlobalPalboxImport = 'save'; bAllowClientMod = 'code'
+    bIsPvP = 'swords'; bEnablePlayerToPlayerDamage = 'sword'; bEnableDefenseOtherGuildPlayer = 'shield'
+    bCanPickupOtherGuildDeathPenaltyDrop = 'bag'; bInvisibleOtherGuildBaseCampAreaFX = 'eye'
+    bAdditionalDropItemWhenPlayerKillingInPvPMode = 'emblem'; AdditionalDropItemWhenPlayerKillingInPvPMode = 'emblem'
+    AdditionalDropItemNumWhenPlayerKillingInPvPMode = 'emblem'; bDisplayPvPItemNumOnWorldMap_BaseCamp = 'map'; bDisplayPvPItemNumOnWorldMap_Player = 'map'
+    DropItemMaxNum = 'box'; PhysicsActiveDropItemMaxNum = 'box'; DropItemAliveMaxHours = 'hourglass'; ServerReplicatePawnCullDistance = 'eye'
+    AutoSaveSpan = 'save'; bIsUseBackupSaveData = 'save'; ItemContainerForceMarkDirtyInterval = 'chest'
+    PlayerDataPalStorageUpdateCheckTickInterval = 'gauge'; BuildingNameDisplayCacheTTLSeconds = 'gauge'; bActiveUNKO = 'poop'; DropItemMaxNum_UNKO = 'poop'
+    ServerName = 'server'; ServerDescription = 'chat'; ServerPassword = 'key'; AdminPassword = 'key'; CrossplayPlatforms = 'globe'
+    PublicPort = 'plug'; PublicIP = 'plug'; RESTAPIEnabled = 'code'; RESTAPIPort = 'plug'; RCONEnabled = 'code'; RCONPort = 'plug'
+    bUseAuth = 'lock'; BanListURL = 'ban'; Region = 'globe'; LogFormatType = 'code'; bIsMultiplay = 'people'; CoopPlayerMaxNum = 'people'
+    DenyTechnologyList = 'ban'
+}
+$TabIcons = @{
+    'Progression' = 'star'; 'Resources' = 'gem'; 'Base' = 'house'; 'Survival' = 'drumstick'; 'Combat' = 'sword'; 'World' = 'globe'
+    'Offline and Guilds' = 'flag'; 'Players and Travel' = 'compass'; 'PvP' = 'swords'; 'Performance' = 'gauge'; 'Server' = 'server'
+}
+
+function New-VPage([string]$Title, [string]$Group) {
+    $page = New-Object VPalUi.Page
+    $page.Text = $Title
+    $page.Group = $Group
+    $i = $PageInfo[$Title]
+    if ($null -ne $i) {
+        $page.IconKey = $i.Icon
+        $page.Subtitle = $i.Sub
+        if ($i.Nav) { $page.NavText = $i.Nav }
+        if ($null -ne $i.Order) { $page.Order = [int]$i.Order }
+    }
+    else { $page.IconKey = 'other' }
+    return $page
+}
+
+function New-TintedIcon([string]$Name, $Color, [int]$Size) {
+    # an icon recolored for the dark look, in a PictureBox
+    $bm = New-Object System.Drawing.Bitmap(($Size * 2), ($Size * 2))
+    $g = [System.Drawing.Graphics]::FromImage($bm)
+    try { [VPalUi.Theme]::DrawTinted($g, [VPalUi.Theme]::Icon($Name), (New-Object System.Drawing.Rectangle(0, 0, ($Size * 2), ($Size * 2))), $Color) }
+    finally { $g.Dispose() }
+    $pb = New-Object System.Windows.Forms.PictureBox
+    $pb.Size = New-Object System.Drawing.Size($Size, $Size)
+    $pb.SizeMode = 'Zoom'
+    $pb.Image = $bm
+    $pb.BackColor = $ColorClear
+    return $pb
+}
+
+function New-CampNotes([string]$Title) {
+    $notes = New-Object VPalUi.Card
+    $notes.Glass = $true
+    $notes.Dock = 'Right'
+    $notes.Width = 300
+    $notes.Text = 'Camp notes'
+    $notes.TitleIcon = [VPalUi.Theme]::Icon('set_star')
+    $notes.TitleFont = New-Object System.Drawing.Font('Segoe UI', 13, [System.Drawing.FontStyle]::Bold)
+    $notes.TitleHeight = 40
+    $notes.BackColor = $ColorClear
+    $notes.Padding = New-Object System.Windows.Forms.Padding(14, 50, 14, 14)
+
+    $art = New-Object System.Windows.Forms.PictureBox
+    $art.Image = [VPalUi.Theme]::Icon('campnotes')
+    $art.SizeMode = 'Zoom'
+    $art.Dock = 'Top'
+    $art.Height = 136
+    $art.BackColor = $ColorClear
+
+    $tips = New-Object System.Windows.Forms.FlowLayoutPanel
+    $tips.FlowDirection = 'TopDown'
+    $tips.WrapContents = $false
+    $tips.Dock = 'Fill'
+    $tips.BackColor = $ColorClear
+    $tips.Padding = New-Object System.Windows.Forms.Padding(0, 16, 0, 0)
+    $list = New-Object System.Collections.Generic.List[object]
+    if ($CampNotes.ContainsKey($Title)) { foreach ($t in $CampNotes[$Title]) { $list.Add($t) } }
+    $list.Add(@('rocket', 'Changes apply when the server restarts. Save & restart does it now.'))
+    foreach ($t in $list) {
+        $line = New-Object System.Windows.Forms.FlowLayoutPanel
+        $line.AutoSize = $true
+        $line.WrapContents = $false
+        $line.BackColor = $ColorClear
+        $line.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
+        $color = [VPalUi.Theme]::TealSoft
+        $icon = 'ui_' + $t[0]
+        if ($t[0] -eq 'peak') { $color = [VPalUi.Theme]::Gold }
+        if ($t[0] -eq 'warn') { $color = [VPalUi.Theme]::Orange; $icon = 'ui_info' }
+        $ic = New-TintedIcon $icon $color 20
+        $ic.Margin = New-Object System.Windows.Forms.Padding(0, 1, 10, 0)
+        $tl = New-Object System.Windows.Forms.Label
+        $tl.AutoSize = $true
+        $tl.UseMnemonic = $false
+        $tl.MaximumSize = New-Object System.Drawing.Size(226, 0)
+        $tl.Font = New-Object System.Drawing.Font('Segoe UI', 10)
+        $tl.ForeColor = [VPalUi.Theme]::Text
+        $tl.BackColor = $ColorClear
+        $tl.Text = $t[1]
+        $line.Controls.Add($ic)
+        $line.Controls.Add($tl)
+        $tips.Controls.Add($line)
+    }
+    $notes.Controls.Add($art)
+    $notes.Controls.Add($tips)
+    $tips.BringToFront()
+    return $notes
+}
+
+# Setting rows: icon | name, Changed badge and description | stepper, switch, list or box | unit and default
+$ColIcon = 56
+$ColCtl = 176
+$ColExtra = 128
+
 function New-TabTable([string]$title) {
-    $page = New-Object System.Windows.Forms.TabPage
-    $page.Text = $title
-    $page.AutoScroll = $true
-    $page.UseVisualStyleBackColor = $true
+    $page = New-VPage $title 'World settings'
+    [void]$page.MakeHeader('World settings')
+
+    $body = New-Object VPalUi.BackdropPanel
+    $body.Tint = $page.Tint
+    $body.Dock = 'Fill'
+    $body.Padding = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+
+    $card = New-Object VPalUi.Card
+    $card.Dock = 'Fill'
+    $card.Padding = New-Object System.Windows.Forms.Padding(2, 4, 2, 4)
+    $scroll = New-Object System.Windows.Forms.Panel
+    $scroll.Dock = 'Fill'
+    $scroll.AutoScroll = $true
+    $scroll.BackColor = [VPalUi.Theme]::Card
+    [VPalUi.Theme]::DarkScrollbars($scroll)
+    $card.Controls.Add($scroll)
+
     $table = New-Object System.Windows.Forms.TableLayoutPanel
-    $table.ColumnCount = 2
+    $table.ColumnCount = 4
     $table.RowCount = 0
-    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 610)))
-    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 250)))
+    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $ColIcon)))
+    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $ColCtl)))
+    [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $ColExtra)))
     $table.AutoSize = $true
     $table.AutoSizeMode = 'GrowAndShrink'
-    $table.Location = New-Object System.Drawing.Point(10, 6)
-    $page.Controls.Add($table)
+    $table.Dock = 'Top'
+    $table.BackColor = [VPalUi.Theme]::Card
+    $table.add_CellPaint({
+        param($s, $e)
+        # a line under each row, and a short divider before the unit and default
+        $pen = New-Object System.Drawing.Pen([VPalUi.Theme]::Line)
+        try {
+            $b = $e.CellBounds
+            if ($e.Row -lt $s.RowCount - 1) {
+                $l = $b.Left
+                $r = $b.Right
+                if ($e.Column -eq 0) { $l += 12 }
+                if ($e.Column -eq 3) { $r -= 12 }
+                $e.Graphics.DrawLine($pen, $l, ($b.Bottom - 1), $r, ($b.Bottom - 1))
+            }
+            if ($e.Column -eq 3 -and $b.Height -gt 40) { $e.Graphics.DrawLine($pen, ($b.Left + 2), ($b.Top + 16), ($b.Left + 2), ($b.Bottom - 16)) }
+        }
+        finally { $pen.Dispose() }
+    })
+    $scroll.Controls.Add($table)
+    $scroll.Tag = $table
+    $scroll.add_Resize({ param($s, $e) Update-RowWidths $s })
+
+    $notes = New-CampNotes $title
+    $gap = New-Object System.Windows.Forms.Panel
+    $gap.Dock = 'Right'
+    $gap.Width = 16
+    $gap.BackColor = $ColorClear
+    $body.Controls.Add($card)
+    $body.Controls.Add($gap)
+    $body.Controls.Add($notes)
+    $card.BringToFront()
+    $body.Tag = @{ Notes = $notes; Gap = $gap }
+    $body.add_Resize({
+        param($s, $e)
+        # Camp notes only when there is room for them
+        $wide = $s.ClientSize.Width -ge 900
+        if ($s.Tag.Notes.Visible -ne $wide) { $s.Tag.Notes.Visible = $wide; $s.Tag.Gap.Visible = $wide }
+    })
+    $page.Controls.Add($body)
+    $body.BringToFront()
+    $page.Tag = $table
     $tabs.TabPages.Add($page)
     return $table
+}
+
+function Update-RowWidths($scroll) {
+    # the descriptions wrap to the width the window leaves them
+    $table = $scroll.Tag
+    if ($null -eq $table) { return }
+    $w = [Math]::Max(200, $scroll.ClientSize.Width - $ColIcon - $ColCtl - $ColExtra - 36)
+    if ($table.Tag -eq $w) { return }
+    $table.Tag = $w
+    $table.SuspendLayout()
+    foreach ($row in $script:Rows) {
+        if ($row.Table -eq $table) {
+            $row.DescLabel.MaximumSize = New-Object System.Drawing.Size($w, 0)
+        }
+    }
+    $table.ResumeLayout()
+}
+
+function Get-SettingIcon($meta) {
+    $n = $SettingIcons[$meta.Key]
+    if (-not $n) { $n = $TabIcons[$meta.Tab] }
+    if (-not $n) { $n = 'gear' }
+    return [VPalUi.Theme]::Icon('set_' + $n)
+}
+
+function Format-Default([string]$Kind, [string]$Raw) {
+    switch ($Kind) {
+        'Float' { $d = Get-Decimal $Raw; if ($null -ne $d) { return $d.ToString('0.0##', $Inv) } }
+        'Int'   { $d = Get-Decimal $Raw; if ($null -ne $d) { return $d.ToString('0', $Inv) } }
+        'Bool'  { if ($Raw.Trim() -ieq 'True') { return 'On' } else { return 'Off' } }
+        'Enum'  { return $Raw.Trim() }
+    }
+    return ''
+}
+
+function Set-RowDefault($row) {
+    # "Default: ..." was clicked: put that setting back to Palworld's default (not saved until Save)
+    $d = [string]$row.Default
+    switch ($row.Kind) {
+        'Float' { $v = Get-Decimal $d; if ($null -ne $v) { $row.Control.Value = [Math]::Max($row.Control.Minimum, [Math]::Min($row.Control.Maximum, $v)) } }
+        'Int'   { $v = Get-Decimal $d; if ($null -ne $v) { $row.Control.Value = [Math]::Max($row.Control.Minimum, [Math]::Min($row.Control.Maximum, $v)) } }
+        'Bool'  { $row.Control.Checked = ($d.Trim() -ieq 'True') }
+        'Enum'  { foreach ($o in @($row.Control.Items)) { if ([string]$o -ieq $d.Trim()) { $row.Control.SelectedItem = $o } } }
+    }
 }
 
 function New-Row($table, $meta, [string]$raw) {
@@ -444,6 +776,8 @@ function New-Row($table, $meta, [string]$raw) {
         if ($kind -eq 'Text' -and $shown.Contains('"')) { $kind = 'Raw' }
     }
 
+    $inputFont = New-Object System.Drawing.Font('Segoe UI', 10)
+    $stepper = $null
     switch ($kind) {
         'Float' {
             $c = New-Object System.Windows.Forms.NumericUpDown
@@ -459,8 +793,7 @@ function New-Row($table, $meta, [string]$raw) {
             elseif ($meta.Max -le 1000) { $c.Increment = [decimal]1 }
             else { $c.Increment = [decimal]100 }
             $c.Value = $origValue
-            $c.Width = 120
-            $c.TextAlign = 'Right'
+            $stepper = New-Object VPalUi.Stepper -ArgumentList @($c, 158)
         }
         'Int' {
             $c = New-Object System.Windows.Forms.NumericUpDown
@@ -473,19 +806,21 @@ function New-Row($table, $meta, [string]$raw) {
             $c.Minimum = $min
             if ($meta.Max -gt 2000) { $c.Increment = [decimal]100 } else { $c.Increment = [decimal]1 }
             $c.Value = $origValue
-            $c.Width = 120
-            $c.TextAlign = 'Right'
+            $stepper = New-Object VPalUi.Stepper -ArgumentList @($c, 158)
         }
         'Bool' {
-            $c = New-Object System.Windows.Forms.CheckBox
+            $c = New-Object VPalUi.Toggle
             $c.Checked = ($raw.Trim() -ieq 'True')
             if ($c.Checked) { $c.Text = 'On' } else { $c.Text = 'Off' }
-            $c.AutoSize = $true
         }
         'Enum' {
             $c = New-Object System.Windows.Forms.ComboBox
             $c.DropDownStyle = 'DropDownList'
-            $c.Width = 170
+            $c.FlatStyle = 'Flat'
+            $c.BackColor = [VPalUi.Theme]::Card2
+            $c.ForeColor = [VPalUi.Theme]::Text
+            $c.Font = $inputFont
+            $c.Width = 158
             $selected = $null
             foreach ($o in $meta.Options) {
                 [void]$c.Items.Add($o)
@@ -499,60 +834,149 @@ function New-Row($table, $meta, [string]$raw) {
         }
         'Text' {
             $c = New-Object System.Windows.Forms.TextBox
-            $c.Width = 240
+            $c.Width = 290
+            $c.Font = $inputFont
+            $c.BorderStyle = 'FixedSingle'
+            $c.BackColor = [VPalUi.Theme]::Card2
+            $c.ForeColor = [VPalUi.Theme]::Text
             $c.Text = $shown
         }
         default {
             $kind = 'Raw'
             $c = New-Object System.Windows.Forms.TextBox
-            $c.Width = 240
+            $c.Width = 290
+            $c.Font = $inputFont
+            $c.BorderStyle = 'FixedSingle'
             $c.ReadOnly = $true
+            $c.BackColor = [VPalUi.Theme]::Card3
+            $c.ForeColor = [VPalUi.Theme]::Muted
             $c.Text = $shown
             if ($meta.Mask) { $c.UseSystemPasswordChar = $true }
         }
     }
-    $c.Margin = New-Object System.Windows.Forms.Padding(0, 10, 0, 6)
-    $c.Font = $FontMain
+    $holder = $c
+    if ($null -ne $stepper) { $holder = $stepper }
+    $holder.Anchor = 'Left'
+    $holder.Margin = New-Object System.Windows.Forms.Padding(6, 12, 6, 12)
+
+    $icon = New-Object System.Windows.Forms.PictureBox
+    $icon.Image = Get-SettingIcon $meta
+    $icon.SizeMode = 'Zoom'
+    $icon.Size = New-Object System.Drawing.Size(34, 34)
+    $icon.BackColor = [VPalUi.Theme]::Card
+    $icon.Anchor = 'Left'
+    $icon.Margin = New-Object System.Windows.Forms.Padding(14, 10, 4, 10)
+
+    $label = [string]$meta.Label
+    $unit = ''
+    if ($label -match '^(.*?)\s*\((hours|minutes|seconds)\)$') { $label = $Matches[1]; $unit = $Matches[2] }
 
     $info = New-Object System.Windows.Forms.FlowLayoutPanel
     $info.FlowDirection = 'TopDown'
     $info.WrapContents = $false
     $info.AutoSize = $true
-    $info.Margin = New-Object System.Windows.Forms.Padding(0, 6, 10, 6)
+    $info.BackColor = [VPalUi.Theme]::Card
+    $info.Anchor = 'Left'
+    $info.Margin = New-Object System.Windows.Forms.Padding(6, 10, 6, 10)
+
+    $nameLine = New-Object System.Windows.Forms.FlowLayoutPanel
+    $nameLine.AutoSize = $true
+    $nameLine.WrapContents = $false
+    $nameLine.BackColor = [VPalUi.Theme]::Card
+    $nameLine.Margin = New-Object System.Windows.Forms.Padding(0)
 
     $name = New-Object System.Windows.Forms.Label
     $name.AutoSize = $true
     $name.UseMnemonic = $false
-    $name.Font = $FontBold
-    $name.Text = $meta.Label
+    $name.Font = $FontName
+    $name.ForeColor = $ColorNormal
+    $name.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 2)
+    $name.Text = $label
+    $nameLine.Controls.Add($name)
+
+    $badge = New-Object VPalUi.Badge
+    $badge.Text = 'Changed'
+    $badge.Visible = $false
+    $nameLine.Controls.Add($badge)
+    if ($kind -eq 'Raw') {
+        $name.ForeColor = $ColorLocked
+        $lock = New-Object VPalUi.Badge
+        $lock.Text = 'Locked'
+        $lock.Fill = [VPalUi.Theme]::Card3
+        $lock.BorderColor = [VPalUi.Theme]::Border
+        $lock.TextColor = [VPalUi.Theme]::Muted
+        $nameLine.Controls.Add($lock)
+    }
 
     $desc = New-Object System.Windows.Forms.Label
     $desc.AutoSize = $true
     $desc.UseMnemonic = $false
-    $desc.MaximumSize = New-Object System.Drawing.Size(590, 0)
-    $desc.Font = $FontSmall
+    $desc.MaximumSize = New-Object System.Drawing.Size(360, 0)
+    $desc.Font = $FontDesc
     $desc.ForeColor = $ColorDesc
-    $desc.Text = $meta.Desc + '    [' + $meta.Key + ']'
-
-    if ($kind -eq 'Raw') {
-        $name.Text = $meta.Label + '   (locked)'
-        $name.ForeColor = $ColorLocked
-    }
-    $info.Controls.Add($name)
+    $desc.Text = $meta.Desc
+    $info.Controls.Add($nameLine)
     $info.Controls.Add($desc)
+    $ToolTip.SetToolTip($name, 'In the settings file: ' + $meta.Key)
+    $ToolTip.SetToolTip($desc, 'In the settings file: ' + $meta.Key)
+
+    $defRaw = $null
+    if ($script:Defaults.ContainsKey($meta.Key) -and ($kind -eq 'Float' -or $kind -eq 'Int' -or $kind -eq 'Bool' -or $kind -eq 'Enum')) {
+        $defRaw = [string]$script:Defaults[$meta.Key]
+        if ($kind -eq 'Enum' -or $kind -eq 'Bool') { $defRaw = $defRaw.Trim().Trim('"') }
+    }
+    $extra = New-Object System.Windows.Forms.FlowLayoutPanel
+    $extra.FlowDirection = 'TopDown'
+    $extra.WrapContents = $false
+    $extra.AutoSize = $true
+    $extra.BackColor = [VPalUi.Theme]::Card
+    $extra.Anchor = 'Left'
+    $extra.Margin = New-Object System.Windows.Forms.Padding(14, 10, 4, 10)
+    if ($unit) {
+        $ub = New-Object VPalUi.Badge
+        $ub.Text = $unit
+        $ub.Fill = [VPalUi.Theme]::Card3
+        $ub.BorderColor = [VPalUi.Theme]::Border
+        $ub.TextColor = [VPalUi.Theme]::Text
+        $ub.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
+        $extra.Controls.Add($ub)
+    }
+    $defLabel = $null
+    $defText = ''
+    if ($null -ne $defRaw) { $defText = Format-Default $kind $defRaw }
+    if ($defText) {
+        $defLabel = New-Object System.Windows.Forms.Label
+        $defLabel.AutoSize = $true
+        $defLabel.UseMnemonic = $false
+        $defLabel.Font = $FontDesc
+        $defLabel.ForeColor = $ColorDesc
+        $defLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $defLabel.Margin = New-Object System.Windows.Forms.Padding(0)
+        $defLabel.Text = 'Default: ' + $defText
+        $ToolTip.SetToolTip($defLabel, "Palworld's default. Click to use it (saved when you click Save).")
+        $extra.Controls.Add($defLabel)
+    }
 
     $r = $table.RowCount
     $table.RowCount = $r + 1
     [void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-    $table.Controls.Add($info, 0, $r)
-    $table.Controls.Add($c, 1, $r)
+    $table.Controls.Add($icon, 0, $r)
+    $table.Controls.Add($info, 1, $r)
+    $table.Controls.Add($holder, 2, $r)
+    if ($kind -eq 'Text' -or $kind -eq 'Raw') { $table.SetColumnSpan($holder, 2) }
+    else { $table.Controls.Add($extra, 3, $r) }
     $ToolTip.SetToolTip($c, $meta.Desc)
 
     $row = [pscustomobject]@{
-        Key = $meta.Key; Meta = $meta; Kind = $kind; Control = $c; NameLabel = $name
+        Key = $meta.Key; Meta = $meta; Kind = $kind; Control = $c; NameLabel = $name; DescLabel = $desc
+        Badge = $badge; Stepper = $stepper; Table = $table; Default = $defRaw
         OrigRaw = $raw; OrigValue = $origValue; Quoted = $quoted
     }
     $c.Tag = $row
+    if ($null -ne $defLabel) {
+        $defLabel.Tag = $row
+        $defLabel.add_Click({ param($s, $e) try { Set-RowDefault $s.Tag } catch { } })
+    }
     switch ($kind) {
         'Float' { $c.add_ValueChanged({ param($s, $e) Update-RowLook $s.Tag }) }
         'Int'   { $c.add_ValueChanged({ param($s, $e) Update-RowLook $s.Tag }) }
@@ -575,6 +999,16 @@ function Build-Editor {
     $values = Get-ValueTable $script:Model
     $script:ServerTitle = 'Palworld'
     if ($values.ContainsKey('ServerName')) { $script:ServerTitle = $values['ServerName'].Trim('"') }
+    $script:Defaults = @{}
+    try {
+        # Palworld's own defaults, shown next to each setting
+        $dp = Join-Path $ServerDir 'DefaultPalWorldSettings.ini'
+        if (Test-Path -LiteralPath $dp) {
+            $dm = ConvertFrom-IniText ([System.IO.File]::ReadAllText($dp))
+            if ($null -ne $dm) { $script:Defaults = Get-ValueTable $dm }
+        }
+    }
+    catch { }
 
     $tabs.SuspendLayout()
     $script:Rows.Clear()
@@ -602,7 +1036,12 @@ function Build-Editor {
     }
 
     foreach ($p in @($tabs.TabPages)) {
-        if ($p.Controls[0].RowCount -eq 0) { $tabs.TabPages.Remove($p); $p.Dispose() }
+        if ($p.Tag -is [System.Windows.Forms.TableLayoutPanel]) {
+            $n = $p.Tag.RowCount
+            if ($n -eq 0) { $tabs.TabPages.Remove($p); $p.Dispose() }
+            elseif ($n -eq 1) { $p.Header.Chip = '1 setting' }
+            else { $p.Header.Chip = "$n settings" }
+        }
     }
     New-MessagesTab
     New-PlannerTab
@@ -624,6 +1063,7 @@ function Build-Editor {
 function Set-Status([string]$Text) {
     if ($null -eq $lblStatus) { return }          # the setup wizard runs before the main window exists
     $lblStatus.Text = $Text
+    if ($null -ne $ToolTip) { $ToolTip.SetToolTip($lblStatus, $Text) }
     $lblStatus.Refresh()
 }
 
@@ -631,6 +1071,7 @@ function Set-Busy([bool]$On) {
     $script:Busy = $On
     foreach ($b in @($btnSave, $btnRestart, $btnUndo, $btnClose, $btnBackups, $btnStart, $btnStop, $btnHealth)) { if ($null -ne $b) { $b.Enabled = -not $On } }
     $tabs.Enabled = -not $On
+    if ($null -ne $nav) { $nav.Enabled = -not $On }
     if ($On) { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor }
     else {
         $form.Cursor = [System.Windows.Forms.Cursors]::Default
@@ -646,23 +1087,40 @@ function Update-ServerStatus {
     }
     $starting = (-not $running) -and (Test-ServerStarting)
 
+    if ($null -eq $status) { return }
+    $status.ServerName = [string]$script:ServerTitle
     if ($running) {
-        $light.BackColor = $ColorOn
-        $lblServer.Text = 'Server running'
-        $lblServer.ForeColor = $ColorOn
+        $status.State = 'Running'
+        $status.StateColor = $ColorOn
     }
     elseif ($starting) {
-        $light.BackColor = $ColorStarting
-        $lblServer.Text = 'Server starting...'
-        $lblServer.ForeColor = $ColorStarting
+        $status.State = 'Starting...'
+        $status.StateColor = $ColorStarting
     }
     else {
-        $light.BackColor = $ColorOff
-        $lblServer.Text = 'Server off'
-        $lblServer.ForeColor = $ColorOff
+        $status.State = 'Off'
+        $status.StateColor = $ColorOff
     }
 
-    # Start only when fully off; Stop only when running. Never both.
+    # Players online, from the watchdog every 15 seconds while the server runs
+    $script:PlayerTick = $script:PlayerTick + 1
+    if (-not $running) { $script:PlayersOnline = $null }
+    elseif (($script:PlayerTick % 3) -eq 1) {
+        try {
+            if (Test-CommandCenter) {
+                $st = Invoke-CC 'status' $null 3
+                if ($null -ne $st.players) { $script:PlayersOnline = [int]$st.players }
+            }
+        }
+        catch { }
+    }
+    if ($null -eq $script:PlayersOnline) { $status.Players = '' }
+    elseif ($script:PlayersOnline -eq 1) { $status.Players = '1 player online' }
+    else { $status.Players = [string]$script:PlayersOnline + ' players online' }
+
+    # Start only when fully off; Stop only when running. Only one of them shows.
+    $btnStart.Visible = -not $running
+    $btnStop.Visible = $running
     if (-not $script:Busy) {
         $btnStart.Enabled = (-not $running) -and (-not $starting)
         $btnStop.Enabled = $running
@@ -857,10 +1315,10 @@ $script:DiagBox    = $null
 $script:DiagIssues = $null
 $script:DiagWatch  = $null
 $script:DiagBusy   = $false
-$ColorGood   = [System.Drawing.Color]::FromArgb(30, 150, 60)
-$ColorFair   = [System.Drawing.Color]::FromArgb(200, 130, 0)
-$ColorBad    = [System.Drawing.Color]::FromArgb(205, 40, 40)
-$ColorInfo   = [System.Drawing.Color]::FromArgb(90, 90, 90)
+$ColorGood   = [VPalUi.Theme]::Green
+$ColorFair   = [VPalUi.Theme]::Gold
+$ColorBad    = [VPalUi.Theme]::Red
+$ColorInfo   = [VPalUi.Theme]::Muted
 $FontDiag    = New-Object System.Drawing.Font('Consolas', 10)
 $FontDiagHd  = New-Object System.Drawing.Font('Consolas', 10, [System.Drawing.FontStyle]::Bold)
 
@@ -880,7 +1338,7 @@ function Add-DiagLine([string]$Text) { Add-DiagText $Text $ColorInfo $FontDiag }
 
 function Add-DiagHeading([string]$Text) {
     Add-DiagText '' $ColorInfo $FontDiag
-    Add-DiagText $Text.ToUpper() ([System.Drawing.SystemColors]::ControlText) $FontDiagHd
+    Add-DiagText $Text.ToUpper() ([VPalUi.Theme]::Text) $FontDiagHd
 }
 
 function Add-DiagResult([string]$Level, [string]$Text) {
@@ -937,7 +1395,7 @@ function Invoke-HealthCheck {
     $script:DiagWatch  = New-Object System.Collections.Generic.List[string]
     $script:DiagBox.Clear()
     $now = Get-Date
-    Add-DiagText ('Palworld server health check  -  ' + $now.ToString('dddd, MMM d, yyyy  h:mm tt')) ([System.Drawing.SystemColors]::ControlText) $FontDiagHd
+    Add-DiagText ('Palworld server health check  -  ' + $now.ToString('dddd, MMM d, yyyy  h:mm tt')) ([VPalUi.Theme]::Text) $FontDiagHd
     Add-DiagLine 'Green = healthy, amber = worth watching, red = needs attention.'
 
     # ---- Server program ----
@@ -1133,7 +1591,7 @@ function Invoke-HealthCheck {
         $txt = "PC to router: average $($r.Avg) ms, worst $($r.Max) ms, $($r.LossPct)% lost."
         if ($r.Lost -eq 0 -and $r.Avg -le 10 -and $r.Max -le 50) { Add-DiagResult 'OK' "$txt Solid." }
         elseif ($r.LossPct -le 10 -and $r.Avg -le 30) { Add-DiagResult 'FAIR' "$txt A little shaky; expect under 10 ms with no loss." }
-        else { Add-DiagResult 'BAD' "$txt Unstable. Check the cable and the office eero." }
+        else { Add-DiagResult 'BAD' "$txt Unstable. Check the network cable and your router." }
     }
     else { Add-DiagResult 'BAD' 'Could not find your router. The PC may be offline.' }
 
@@ -1241,7 +1699,8 @@ function Show-HealthCheck {
     $box = New-Object System.Windows.Forms.RichTextBox
     $box.ReadOnly = $true
     $box.Dock = 'Fill'
-    $box.BackColor = [System.Drawing.Color]::White
+    $box.BackColor = [VPalUi.Theme]::Card2
+    $box.ForeColor = [VPalUi.Theme]::Text
     $box.Font = $FontDiag
     $box.BorderStyle = 'None'
     $box.DetectUrls = $false
@@ -1284,6 +1743,7 @@ function Show-HealthCheck {
     $dlg.Controls.Add($box)
     $dlg.Controls.Add($bar)
     $box.BringToFront()
+    [VPalUi.Dark]::Apply($dlg)
     [void]$dlg.ShowDialog($form)
     $dlg.Dispose()
 }
@@ -1434,13 +1894,10 @@ function New-SmallLabel([string]$Text, [int]$X, [int]$Y, [int]$Width) {
 }
 
 function New-MessagesTab {
-    $page = New-Object System.Windows.Forms.TabPage
-    $page.Text = 'Messages'
-    $page.AutoScroll = $true
-    $page.UseVisualStyleBackColor = $true
+    $page = New-ToolPage 'Messages'
 
     # --- Welcome message ---
-    $g1 = New-Object System.Windows.Forms.GroupBox
+    $g1 = New-Object VPalUi.CardGroup
     $g1.Text = 'Welcome message'
     $g1.Font = $FontBold
     $g1.Location = New-Object System.Drawing.Point(10, 10)
@@ -1478,7 +1935,7 @@ function New-MessagesTab {
     $g1.Controls.Add($lw)
 
     # --- Send a message now ---
-    $g2 = New-Object System.Windows.Forms.GroupBox
+    $g2 = New-Object VPalUi.CardGroup
     $g2.Text = 'Send a message to everyone now'
     $g2.Font = $FontBold
     $g2.Location = New-Object System.Drawing.Point(10, 196)
@@ -2297,6 +2754,7 @@ function Show-PlayerDialog($Player) {
         $d.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $d.Close()
     })
+    [VPalUi.Dark]::Apply($d)
     if ($d.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { $d.Dispose(); return $null }
 
     if ($isNew) { $Player = [ordered]@{ real = ''; game = ''; uid = ''; code = (New-PlannerCode); phone = ''; email = ''; invited = '' } }
@@ -2404,14 +2862,11 @@ function Edit-PlannerPlayer {
 }
 
 function New-PlannerTab {
-    $page = New-Object System.Windows.Forms.TabPage
-    $page.Text = 'Pal Planner'
-    $page.AutoScroll = $true
-    $page.UseVisualStyleBackColor = $true
+    $page = New-ToolPage 'Pal Planner'
     $ui = @{}
 
     # --- Family link ---
-    $g1 = New-Object System.Windows.Forms.GroupBox
+    $g1 = New-Object VPalUi.CardGroup
     $g1.Text = 'Family link'
     $g1.Font = $FontBold
     $g1.Location = New-Object System.Drawing.Point(10, 10)
@@ -2440,7 +2895,7 @@ function New-PlannerTab {
     $g1.Controls.Add($f1)
 
     # --- Pal data ---
-    $g2 = New-Object System.Windows.Forms.GroupBox
+    $g2 = New-Object VPalUi.CardGroup
     $g2.Text = 'Pal data'
     $g2.Font = $FontBold
     $g2.Location = New-Object System.Drawing.Point(10, 176)
@@ -2475,12 +2930,12 @@ function New-PlannerTab {
     $g2.Controls.Add($f2)
 
     # --- Players ---
-    $g3 = New-Object System.Windows.Forms.GroupBox
+    $g3 = New-Object VPalUi.CardGroup
     $g3.Text = 'Players and codes'
     $g3.Font = $FontBold
     $g3.Location = New-Object System.Drawing.Point(10, 284)
     $g3.Size = New-Object System.Drawing.Size(860, 262)
-    $lv = New-Object System.Windows.Forms.ListView
+    $lv = New-Object VPalUi.DarkList
     $lv.View = 'Details'
     $lv.FullRowSelect = $true
     $lv.MultiSelect = $false
@@ -2594,7 +3049,7 @@ function New-PlannerTab {
     $lv.add_DoubleClick({ Edit-PlannerPlayer })
 
     # --- Planner page: its name and who to ask for a code ---
-    $g4 = New-Object System.Windows.Forms.GroupBox
+    $g4 = New-Object VPalUi.CardGroup
     $g4.Text = 'Planner page'
     $g4.Font = $FontBold
     $g4.Location = New-Object System.Drawing.Point(10, 556)
@@ -2688,7 +3143,7 @@ function Format-Bytes($Bytes) {
 function Get-NowUnix { return [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
 
 function New-Group([string]$Title, [int]$Y, [int]$Height) {
-    $g = New-Object System.Windows.Forms.GroupBox
+    $g = New-Object VPalUi.CardGroup
     $g.Text = $Title
     $g.Font = $FontBold
     $g.Location = New-Object System.Drawing.Point(10, $Y)
@@ -2708,12 +3163,12 @@ function New-Text([string]$Text, [int]$X, [int]$Y, [int]$Width, [switch]$Bold) {
 }
 
 function New-Check([string]$Text) {
-    $c = New-Object System.Windows.Forms.CheckBox
+    $c = New-Object VPalUi.Check
     $c.Text = $Text
     $c.AutoSize = $true
     $c.UseMnemonic = $false
     $c.Font = $FontMain
-    $c.Margin = New-Object System.Windows.Forms.Padding(0, 4, 2, 0)
+    $c.Margin = New-Object System.Windows.Forms.Padding(0, 6, 2, 0)
     return $c
 }
 
@@ -2743,8 +3198,16 @@ function New-Line([int]$X, [int]$Y, [object[]]$Parts) {
             $l.AutoSize = $true
             $l.UseMnemonic = $false
             $l.Font = $FontMain
-            $l.Margin = New-Object System.Windows.Forms.Padding(0, 5, 2, 0)
+            $l.Margin = New-Object System.Windows.Forms.Padding(0, 7, 2, 0)
             $f.Controls.Add($l)
+        }
+        elseif ($p -is [System.Windows.Forms.NumericUpDown]) {
+            # number boxes get the - and + buttons (the NumericUpDown itself is still what the code reads)
+            $st = New-Object VPalUi.Stepper -ArgumentList @($p, ($p.Width + 64))
+            $p.Font = $FontBold
+            $st.Height = 30
+            $st.Margin = New-Object System.Windows.Forms.Padding(2, 0, 4, 0)
+            $f.Controls.Add($st)
         }
         else { $f.Controls.Add($p) }
     }
@@ -2785,7 +3248,7 @@ function New-ButtonRow([int]$X, [int]$Y, [object[]]$Buttons) {
 }
 
 function New-List([int]$X, [int]$Y, [int]$W, [int]$H, [object[]]$Cols) {
-    $lv = New-Object System.Windows.Forms.ListView
+    $lv = New-Object VPalUi.DarkList
     $lv.View = 'Details'
     $lv.FullRowSelect = $true
     $lv.MultiSelect = $false
@@ -2799,10 +3262,9 @@ function New-List([int]$X, [int]$Y, [int]$W, [int]$H, [object[]]$Cols) {
 }
 
 function New-ToolPage([string]$Title) {
-    $page = New-Object System.Windows.Forms.TabPage
-    $page.Text = $Title
-    $page.AutoScroll = $true
-    $page.UseVisualStyleBackColor = $true
+    # a Server page: its header and scrolling body are added when it joins the window
+    $page = New-VPage $Title 'Server'
+    $page.WrapContent = $true
     return $page
 }
 
@@ -3962,13 +4424,12 @@ function Format-VPalUpdateNote($I) {
 }
 
 function Set-HeaderFit {
-    # Keeps the help text in the top bar clear of the buttons on the right (the Update button makes them wider).
-    if ($null -eq $lblHelp -or $null -eq $header -or $header.IsDisposed) { return }
-    $serverBar.PerformLayout()
-    $header.PerformLayout()
-    $w = [Math]::Max(180, [Math]::Min(420, $header.ClientSize.Width - $serverBar.Width - 24))
-    $lblHelp.MaximumSize = New-Object System.Drawing.Size($w, 0)
-    $header.Height = [Math]::Max(64, $lblHelp.Bottom + 8)
+    # Keeps the last message in the bottom bar clear of the buttons on the right.
+    if ($null -eq $lblStatus -or $null -eq $buttons -or $buttons.IsDisposed) { return }
+    $buttons.PerformLayout()
+    $w = $bar.ClientSize.Width - $buttons.Width - $lblStatus.Left - 12
+    $lblStatus.Visible = ($w -ge 80)
+    if ($w -ge 80) { $lblStatus.Width = $w }
 }
 
 function Update-VPalUpdate($I = $null) {
@@ -4062,6 +4523,7 @@ function Show-VPalUpdateProgress([string]$To) {
         catch { Stop-VPalUpdate ('The update did not start. ' + [string]$_.Exception.Message) }
     })
     foreach ($c in @($lbl, $bar, $btn)) { $dlg.Controls.Add($c) }
+    [VPalUi.Dark]::Apply($dlg)
     try { [void]$dlg.ShowDialog($form) }
     finally {
         $tm.Stop()
@@ -4521,7 +4983,7 @@ function Show-SetupWizard {
     $sum.Multiline = $true
     $sum.ReadOnly = $true
     $sum.ScrollBars = 'Vertical'
-    $sum.BackColor = [System.Drawing.SystemColors]::Window
+    $sum.BackColor = [VPalUi.Theme]::Card2
     $sum.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
     $sum.Location = New-Object System.Drawing.Point(22, 56)
     $sum.Size = New-Object System.Drawing.Size(596, 460)
@@ -4569,6 +5031,7 @@ function Show-SetupWizard {
         if ($script:WZ.Busy) { $e.Cancel = $true; Show-Message 'Please wait until this step finishes.' }
     })
 
+    [VPalUi.Dark]::Apply($f)
     [void]$f.ShowDialog()
     $f.Dispose()
     return [bool]$script:WZ.Done
@@ -4677,126 +5140,154 @@ function Invoke-SetupSteps {
 try {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'VPal Server Command Center'
-    $form.Size = New-Object System.Drawing.Size(960, 760)
-    $form.MinimumSize = New-Object System.Drawing.Size(940, 520)
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $fw = [Math]::Min(1300, $wa.Width - 40)
+    $fh = [Math]::Min(880, $wa.Height - 40)
+    $form.Size = New-Object System.Drawing.Size($fw, $fh)
+    $form.MinimumSize = New-Object System.Drawing.Size(([Math]::Min(1180, $fw)), ([Math]::Min(680, $fh)))
     $form.StartPosition = 'CenterScreen'
     $form.Font = $FontMain
+    $form.BackColor = [VPalUi.Theme]::Navy
+    $form.ForeColor = [VPalUi.Theme]::Text
+    try { $form.Icon = New-Object System.Drawing.Icon((Join-Path $UiDir 'vpal.ico')) } catch { }
 
     $ToolTip = New-Object System.Windows.Forms.ToolTip
     $ToolTip.AutoPopDelay = 15000
 
-    function New-Button([string]$Text) {
-        $b = New-Object System.Windows.Forms.Button
+    function New-Button([string]$Text, [string]$Icon = '', [string]$Kind = 'Outline') {
+        # Kind: Outline, Accent (teal edge), Primary (teal), Danger (red edge), Gold
+        $b = New-Object VPalUi.RoundButton
         $b.Text = $Text
         $b.AutoSize = $true
         $b.Height = 32
-        $b.Padding = New-Object System.Windows.Forms.Padding(8, 2, 8, 2)
+        $b.Padding = New-Object System.Windows.Forms.Padding(12, 0, 12, 0)
         $b.Margin = New-Object System.Windows.Forms.Padding(4, 0, 4, 0)
+        if ($Icon) { $b.IconImage = [VPalUi.Theme]::Icon('ui_' + $Icon) }
+        $b.Kind = $Kind
         return $b
     }
 
-    # Top bar: help text on the left; status light and server buttons on the right
-    $header = New-Object System.Windows.Forms.Panel
+    # The night scene behind everything, the sidebar on the left
+    $shell = New-Object VPalUi.BackdropPanel
+    $shell.Dock = 'Fill'
+    [VPalUi.Theme]::Host = $shell
+    $nav = New-Object VPalUi.NavList
+    $nav.Dock = 'Left'
+    $nav.Width = 240
+    $nav.Logo = [VPalUi.Theme]::Icon('vpal_v128')
+    $nav.Title = 'VPal'
+    $nav.Subtitle = 'Command Center'
+    $right = New-Object VPalUi.BackdropPanel
+    $right.Dock = 'Fill'
+
+    # Top bar: the server card on the left; Update VPal, Health check and Start or Stop on the right
+    $header = New-Object VPalUi.BackdropPanel
     $header.Dock = 'Top'
-    $header.Height = 64
+    $header.Height = 92
+    $status = New-Object VPalUi.StatusCard
+    $status.ServerName = 'Palworld'
+    $status.State = 'Checking...'
+    $status.StateColor = [VPalUi.Theme]::Faint
+    $status.Location = New-Object System.Drawing.Point(24, 18)
+    $header.Controls.Add($status)
 
     $serverBar = New-Object System.Windows.Forms.FlowLayoutPanel
     $serverBar.Dock = 'Right'
-    $serverBar.FlowDirection = 'LeftToRight'
+    $serverBar.FlowDirection = 'RightToLeft'
     $serverBar.AutoSize = $true
     $serverBar.WrapContents = $false
-    $serverBar.Padding = New-Object System.Windows.Forms.Padding(0, 14, 8, 0)
-
-    $light = New-Object System.Windows.Forms.Panel
-    $light.Size = New-Object System.Drawing.Size(18, 18)
-    $light.Margin = New-Object System.Windows.Forms.Padding(0, 7, 6, 0)
-    $circle = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $circle.AddEllipse(0, 0, 18, 18)
-    $light.Region = New-Object System.Drawing.Region($circle)
-    $light.BackColor = $ColorOff
-
-    $lblServer = New-Object System.Windows.Forms.Label
-    $lblServer.AutoSize = $true
-    $lblServer.MinimumSize = New-Object System.Drawing.Size(128, 0)
-    $lblServer.Font = $FontBold
-    $lblServer.Margin = New-Object System.Windows.Forms.Padding(0, 8, 10, 0)
-    $lblServer.Text = 'Checking...'
-
-    $btnStart  = New-Button 'Start server'
-    $btnStop   = New-Button 'Stop server'
-    $btnHealth = New-Button 'Health check'
-    $btnStart.Font = $FontBold
-    $btnVPal = New-Button 'Update VPal'
-    $btnVPal.Font = $FontBold
+    $serverBar.BackColor = $ColorClear
+    $serverBar.Padding = New-Object System.Windows.Forms.Padding(0, 27, 24, 0)
+    $btnStop   = New-Button 'Stop server' 'stop' 'Danger'
+    $btnStart  = New-Button 'Start server' 'start' 'Primary'
+    $btnHealth = New-Button 'Health check' 'watchdog' 'Accent'
+    $btnVPal   = New-Button 'Update VPal' 'update' 'Gold'
+    foreach ($b in @($btnStop, $btnStart, $btnHealth, $btnVPal)) {
+        $b.Height = 40
+        $b.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+        $serverBar.Controls.Add($b)
+    }
+    $btnStart.Visible = $false
     $btnVPal.Visible = $false
-    $btnVPal.UseVisualStyleBackColor = $false
-    $btnVPal.BackColor = [System.Drawing.Color]::FromArgb(214, 240, 214)
-    $btnVPal.Margin = New-Object System.Windows.Forms.Padding(4, 0, 16, 0)
     $ToolTip.SetToolTip($btnVPal, 'A newer VPal is out. Click to see what is new and update. The game server keeps running.')
-    foreach ($ctl in @($btnVPal, $light, $lblServer, $btnStart, $btnStop, $btnHealth)) { $serverBar.Controls.Add($ctl) }
-
-    $lblHelp = New-Object System.Windows.Forms.Label
-    $lblHelp.AutoSize = $true
-    $lblHelp.UseMnemonic = $false
-    $lblHelp.MaximumSize = New-Object System.Drawing.Size(420, 0)
-    $lblHelp.Location = New-Object System.Drawing.Point(12, 10)
-    $lblHelp.ForeColor = $ColorDesc
-    $lblHelp.Text = 'Change any value, then click Save. Changed settings turn orange until saved. ' +
-                    'Grey settings are locked because your scripts depend on them. Every save keeps a backup.'
+    $ToolTip.SetToolTip($btnHealth, 'Checks the server, its ports, the watchdog and this PC, and says what to fix.')
     $header.Controls.Add($serverBar)
-    $header.Controls.Add($lblHelp)
 
-    # Tabs
-    $tabs = New-Object System.Windows.Forms.TabControl
+    # The pages; the sidebar follows them
+    $tabs = New-Object VPalUi.PageHost
     $tabs.Dock = 'Fill'
-    $tabs.Multiline = $true
     $tabs.add_SelectedIndexChanged({
         try { if ($null -ne $tabs.SelectedTab -and $tabs.SelectedTab.Text -eq 'Messages') { Update-WelcomeState } } catch { }
         try { if ($null -ne $tabs.SelectedTab -and $tabs.SelectedTab.Text -eq 'Pal Planner' -and -not $script:Busy) { Update-PlannerTab } } catch { }
         try { Update-SelectedTab } catch { }
     })
+    $nav.Bind($tabs)
 
-    # Bottom bar
-    $bottom = New-Object System.Windows.Forms.Panel
+    # Bottom bar: unsaved changes and the last message on the left; the save buttons on the right
+    $bottom = New-Object VPalUi.BackdropPanel
     $bottom.Dock = 'Bottom'
-    $bottom.Height = 74
+    $bottom.Height = 92
+    $bottom.Padding = New-Object System.Windows.Forms.Padding(24, 10, 24, 18)
+    $bar = New-Object VPalUi.Card
+    $bar.Glass = $true
+    $bar.Dock = 'Fill'
+    $bar.BackColor = $ColorClear
 
+    $chgDot = New-Object VPalUi.Dot
+    $chgDot.Location = New-Object System.Drawing.Point(20, 25)
     $lblChanges = New-Object System.Windows.Forms.Label
     $lblChanges.AutoSize = $true
-    $lblChanges.Font = $FontBold
-    $lblChanges.Location = New-Object System.Drawing.Point(12, 10)
+    $lblChanges.UseMnemonic = $false
+    $lblChanges.Font = New-Object System.Drawing.Font('Segoe UI', 11.5, [System.Drawing.FontStyle]::Bold)
+    $lblChanges.BackColor = $ColorClear
+    $lblChanges.Location = New-Object System.Drawing.Point(42, 21)
 
     $lblStatus = New-Object System.Windows.Forms.Label
-    $lblStatus.AutoSize = $true
+    $lblStatus.AutoSize = $false
+    $lblStatus.AutoEllipsis = $true
     $lblStatus.UseMnemonic = $false
-    $lblStatus.MaximumSize = New-Object System.Drawing.Size(380, 0)
-    $lblStatus.Font = $FontSmall
+    $lblStatus.Font = New-Object System.Drawing.Font('Segoe UI', 9.75)
     $lblStatus.ForeColor = $ColorDesc
-    $lblStatus.Location = New-Object System.Drawing.Point(12, 34)
+    $lblStatus.BackColor = $ColorClear
+    $lblStatus.TextAlign = 'MiddleLeft'
+    $lblStatus.Location = New-Object System.Drawing.Point(236, 12)
+    $lblStatus.Size = New-Object System.Drawing.Size(200, 40)
 
     $buttons = New-Object System.Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Right'
     $buttons.FlowDirection = 'RightToLeft'
     $buttons.AutoSize = $true
     $buttons.WrapContents = $false
-    $buttons.Padding = New-Object System.Windows.Forms.Padding(0, 18, 8, 0)
+    $buttons.BackColor = $ColorClear
+    $buttons.Padding = New-Object System.Windows.Forms.Padding(0, 13, 12, 0)
+    $btnClose   = $null                      # the window's own X closes it
+    $btnRestart = New-Button 'Save & restart' 'rocket' 'Primary'
+    $btnSave    = New-Button 'Save' 'save' 'Accent'
+    $btnUndo    = New-Button 'Undo changes' 'undo'
+    $btnBackups = New-Button 'Settings backups' 'backups'
+    foreach ($b in @($btnRestart, $btnSave, $btnUndo, $btnBackups)) {
+        $b.Height = 38
+        $b.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+        $buttons.Controls.Add($b)
+    }
+    $ToolTip.SetToolTip($btnRestart, 'Saves your changes, then restarts the server so they apply.')
+    $ToolTip.SetToolTip($btnSave, 'Saves your changes. They apply the next time the server starts. Every save keeps a backup.')
+    $ToolTip.SetToolTip($btnUndo, 'Throws away unsaved changes and reloads the settings file.')
+    $ToolTip.SetToolTip($btnBackups, 'Opens the folder with a backup of the settings file from every save.')
+    $bar.Controls.Add($buttons)
+    $bar.Controls.Add($chgDot)
+    $bar.Controls.Add($lblChanges)
+    $bar.Controls.Add($lblStatus)
+    $bottom.Controls.Add($bar)
 
-    $btnClose   = New-Button 'Close'
-    $btnRestart = New-Button 'Save and restart server'
-    $btnSave    = New-Button 'Save'
-    $btnUndo    = New-Button 'Undo changes'
-    $btnBackups = New-Button 'Settings backups'
-    $btnSave.Font = $FontBold
-    foreach ($b in @($btnClose, $btnRestart, $btnSave, $btnUndo, $btnBackups)) { $buttons.Controls.Add($b) }
-
-    $bottom.Controls.Add($buttons)
-    $bottom.Controls.Add($lblChanges)
-    $bottom.Controls.Add($lblStatus)
-
-    $form.Controls.Add($tabs)
-    $form.Controls.Add($header)
-    $form.Controls.Add($bottom)
+    $right.Controls.Add($tabs)
+    $right.Controls.Add($header)
+    $right.Controls.Add($bottom)
     $tabs.BringToFront()
+    $shell.Controls.Add($right)
+    $shell.Controls.Add($nav)
+    $right.BringToFront()
+    $form.Controls.Add($shell)
 
     # ---- Button actions ----
     $btnStart.add_Click({
@@ -4884,8 +5375,6 @@ try {
         catch { Show-Message ("Could not open the backups folder:`n`n" + $_.Exception.Message) 'Error' }
     })
 
-    $btnClose.add_Click({ $form.Close() })
-
     $form.add_FormClosing({
         param($s, $e)
         if ($script:Relaunching) { return }          # reopening on a new VPal version (unsaved changes were dealt with)
@@ -4916,7 +5405,7 @@ try {
     if (-not (Invoke-FirstRunCheck)) { return }      # a new server: the setup wizard first
     $null = Build-Editor
     Update-ServerStatus
-    Set-Status ('Loaded ' + $IniPath)
+    Set-Status 'Every save keeps a backup.'
     $timer.Start()
     [void]$form.ShowDialog()
     $timer.Stop()

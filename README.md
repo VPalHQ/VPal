@@ -11,7 +11,7 @@ A free control panel for running a **Palworld dedicated server on your own Windo
 ## What it does
 
 - **Setup in one window.** It downloads the free Palworld Dedicated Server from Steam, writes its settings from a few questions, adds the firewall rules and shows exactly what to forward on your router.
-- **Settings editor.** Every server setting, explained, with a backup on each save.
+- **Settings editor.** Every server setting explained, each with its own icon, Palworld's default beside it, and a backup on each save, under a starry-night look.
 - **Watchdog.** Starts the server again after a crash or a freeze, restarts it with an in-game warning when memory runs high, installs game updates and waits for the ports to be free before starting.
 - **Daily restarts** at the times you pick, with warnings in the game first.
 - **Backups.** Zips the world every few hours and before restarts. Restore any backup after seeing who and what is in it, and a safety copy is always made first.
@@ -49,6 +49,7 @@ Settings > Apps > **VPal Server Command Center** > Uninstall. Your Palworld serv
 ## Building from source
 
 - `PalworldSettingsEditor.ps1` is the control panel (Windows PowerShell 5.1, WinForms).
+- `CommandCenter/service/ui` is the control panel's look: `VPalUi.cs` (its custom-drawn controls, which the control panel compiles with Add-Type the first time it opens), the backdrop and the icons.
 - `CommandCenter/service` is the watchdog (Python 3.9+, standard library plus psutil).
 - `PalPlanner` is the save reader and the players' website.
 - `build/` has the NSIS 3 installer scripts and `make_release.py`, which makes a release's update zip and `vpal-update.json`.

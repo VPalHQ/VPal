@@ -6,7 +6,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 !define APP "VPal Server Command Center"
-!define VER "0.5.3"
+!define VER "0.6.0"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\VPal"
 
 Name "${APP}"
@@ -15,7 +15,7 @@ InstallDir "C:\VPal"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "VPal ${VER} (beta). Unofficial, not affiliated with Pocketpair."
-VIProductVersion "0.5.3.0"
+VIProductVersion "0.6.0.0"
 VIAddVersionKey "ProductName" "${APP}"
 VIAddVersionKey "FileDescription" "${APP} setup"
 VIAddVersionKey "FileVersion" "${VER}"
@@ -125,6 +125,7 @@ Section "Uninstall"
   Delete "$INSTDIR\NOTICE.txt"
   RMDir /r "$INSTDIR\CommandCenter\service"
   RMDir /r "$INSTDIR\CommandCenter\data\updates"
+  RMDir /r "$INSTDIR\CommandCenter\data\ui"
   Delete "$INSTDIR\CommandCenter\README.txt"
   RMDir "$INSTDIR\CommandCenter"
   RMDir /r "$INSTDIR\PalPlanner\engine"

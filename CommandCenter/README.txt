@@ -67,6 +67,8 @@ Files
   service\cc\            its parts
   service\lib\           psutil (BSD-3-Clause), for process and memory information
   service\vpal_updater.py  puts a VPal update in place while the watchdog is closed for a moment
+  service\ui\            the control panel's look: VPalUi.cs (its custom-drawn controls), the
+                         night backdrop and the icons, all original VPal art
   data\                  settings, activity log, player list, backups (made when it runs)
   data\updates\          the last VPal update's log, and a copy of each file it replaced
 

@@ -18,6 +18,9 @@ Into the folder you pick (C:\VPal unless you change it):
   PalPlanner\                   the Pal Planner (the family pal website)
   NOTICE.txt                    this file
 Shortcuts on the desktop and in the Start menu, and an entry in Apps (to uninstall).
+The first time the control panel opens (and after each VPal update) it builds its look
+from CommandCenter\service\ui\VPalUi.cs with the C# compiler that comes with Windows,
+and keeps the result in CommandCenter\data\ui so it opens quickly after that.
 
 
 What happens when you set up a server in the control panel
