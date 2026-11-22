@@ -657,7 +657,7 @@ function New-TabTable([string]$title) {
     [VPalUi.Theme]::DarkScrollbars($scroll)
     $card.Controls.Add($scroll)
 
-    $table = New-Object System.Windows.Forms.TableLayoutPanel
+    $table = New-Object VPalUi.RowTable          # draws the line under each row itself
     $table.ColumnCount = 4
     $table.RowCount = 0
     [void]$table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $ColIcon)))
@@ -668,23 +668,6 @@ function New-TabTable([string]$title) {
     $table.AutoSizeMode = 'GrowAndShrink'
     $table.Dock = 'Top'
     $table.BackColor = [VPalUi.Theme]::Card
-    $table.add_CellPaint({
-        param($s, $e)
-        # a line under each row, and a short divider before the unit and default
-        $pen = New-Object System.Drawing.Pen([VPalUi.Theme]::Line)
-        try {
-            $b = $e.CellBounds
-            if ($e.Row -lt $s.RowCount - 1) {
-                $l = $b.Left
-                $r = $b.Right
-                if ($e.Column -eq 0) { $l += 12 }
-                if ($e.Column -eq 3) { $r -= 12 }
-                $e.Graphics.DrawLine($pen, $l, ($b.Bottom - 1), $r, ($b.Bottom - 1))
-            }
-            if ($e.Column -eq 3 -and $b.Height -gt 40) { $e.Graphics.DrawLine($pen, ($b.Left + 2), ($b.Top + 16), ($b.Left + 2), ($b.Bottom - 16)) }
-        }
-        finally { $pen.Dispose() }
-    })
     $scroll.Controls.Add($table)
     $scroll.Tag = $table
     $scroll.add_Resize({ param($s, $e) Update-RowWidths $s })
@@ -1051,6 +1034,7 @@ function Build-Editor {
     New-DiscordTab
     $tabs.ResumeLayout()
     if ($selected -ge 0 -and $selected -lt $tabs.TabPages.Count) { $tabs.SelectedIndex = $selected }
+    $tabs.WarmUp()            # prepares the other pages in the background, so switching to them is instant
 
     $serverName = 'Palworld'
     if ($values.ContainsKey('ServerName')) { $serverName = $values['ServerName'].Trim('"') }

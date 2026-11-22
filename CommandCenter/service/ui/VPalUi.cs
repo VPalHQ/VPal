@@ -202,6 +202,9 @@ namespace VPalUi
             return null;
         }
 
+        // Draws what is behind a control (its parent's background) so rounded corners and glass blend in.
+        // Only the background: the parent's own drawing never sits under its children, and repainting it made
+        // every switch, stepper and badge repaint the whole settings list.
         internal static void PaintParent(Control self, PaintEventArgs e, Action<Control, PaintEventArgs> bg, Action<Control, PaintEventArgs> fg)
         {
             if (self.Parent == null) return;
@@ -210,8 +213,15 @@ namespace VPalUi
             g.TranslateTransform(-self.Left, -self.Top);
             PaintEventArgs pe = new PaintEventArgs(g, new Rectangle(self.Left, self.Top, self.Width, self.Height));
             bg(self.Parent, pe);
-            fg(self.Parent, pe);
             g.Restore(st);
+        }
+
+        public static void CreateHandles(Control c)
+        {
+            // builds the windows behind a control and everything in it now, so showing it later is quick
+            if (c == null || c.IsDisposed) return;
+            if (!c.IsHandleCreated) { IntPtr h = c.Handle; }
+            foreach (Control k in c.Controls) CreateHandles(k);
         }
     }
 
@@ -422,12 +432,49 @@ namespace VPalUi
         int sel = -1;
         public event EventHandler SelectedIndexChanged;
         public event EventHandler PagesChanged;
+        readonly Timer warm = new Timer();
+
+        [DllImport("user32.dll")]
+        static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        const int WM_SETREDRAW = 0x000B;
 
         public PageHost()
         {
             TabPages = new PageCollection(this);
             Tint = Theme.Alpha(Theme.Navy, 70);
+            warm.Interval = 60;
+            warm.Tick += delegate { WarmNext(); };
         }
+
+        bool Redraw(bool on)
+        {
+            if (!IsHandleCreated) return false;
+            try { SendMessage(Handle, WM_SETREDRAW, on ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero); return true; }
+            catch { return false; }
+        }
+
+        // Prepares the hidden pages one at a time (their windows and layout), so switching to them is instant.
+        public void WarmUp() { warm.Stop(); warm.Start(); }
+
+        void WarmNext()
+        {
+            foreach (Page p in TabPages.Items)
+            {
+                if (p.IsDisposed || p == SelectedTab || warmed.ContainsKey(p)) continue;
+                SuspendLayout();
+                try
+                {
+                    if (p.Size != ClientSize) p.Bounds = DisplayRectangle;
+                    Theme.CreateHandles(p);
+                    p.PerformLayout();
+                }
+                finally { ResumeLayout(false); }
+                warmed[p] = true;
+                return;
+            }
+            warm.Stop();
+        }
+        readonly Dictionary<Page, bool> warmed = new Dictionary<Page, bool>();
 
         public int SelectedIndex
         {
@@ -436,13 +483,21 @@ namespace VPalUi
             {
                 int v = (value >= 0 && value < TabPages.Count) ? value : (TabPages.Count > 0 ? 0 : -1);
                 if (v == sel) return;
+                bool paused = Redraw(false);
                 SuspendLayout();
-                Page old = (sel >= 0 && sel < TabPages.Count) ? TabPages[sel] : null;
-                sel = v;
-                Page now = SelectedTab;
-                if (now != null) { now.Visible = true; now.BringToFront(); }
-                if (old != null && old != now) old.Visible = false;
-                ResumeLayout(true);
+                try
+                {
+                    Page old = (sel >= 0 && sel < TabPages.Count) ? TabPages[sel] : null;
+                    sel = v;
+                    Page now = SelectedTab;
+                    if (now != null) { now.Visible = true; now.BringToFront(); }
+                    if (old != null && old != now) old.Visible = false;
+                }
+                finally
+                {
+                    ResumeLayout(true);
+                    if (paused) { Redraw(true); Invalidate(true); Update(); }
+                }
                 if (SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty);
             }
         }
@@ -465,10 +520,42 @@ namespace VPalUi
 
         internal void Removed(Page p, int index)
         {
+            warmed.Remove(p);
             Controls.Remove(p);
             if (index == sel) sel = -1;
             else if (index < sel) sel--;
             if (PagesChanged != null) PagesChanged(this, EventArgs.Empty);
+        }
+    }
+
+    // The settings list: a line under each row and a short divider before the unit and default, drawn here
+    // (drawing them from PowerShell made every repaint slow).
+    public class RowTable : TableLayoutPanel
+    {
+        public Color LineColor { get; set; }
+        public int DividerColumn { get; set; }
+
+        public RowTable()
+        {
+            LineColor = Theme.Line;
+            DividerColumn = 3;
+            DoubleBuffered = true;
+        }
+
+        protected override void OnCellPaint(TableLayoutCellPaintEventArgs e)
+        {
+            base.OnCellPaint(e);
+            Rectangle b = e.CellBounds;
+            using (Pen p = new Pen(LineColor))
+            {
+                if (e.Row < RowCount - 1)
+                {
+                    int l = b.Left + (e.Column == 0 ? 12 : 0);
+                    int r = b.Right - (e.Column == ColumnCount - 1 ? 12 : 0);
+                    e.Graphics.DrawLine(p, l, b.Bottom - 1, r, b.Bottom - 1);
+                }
+                if (e.Column == DividerColumn && b.Height > 40) e.Graphics.DrawLine(p, b.Left + 2, b.Top + 16, b.Left + 2, b.Bottom - 16);
+            }
         }
     }
 
@@ -726,11 +813,11 @@ namespace VPalUi
         protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); down = false; Invalidate(); }
         protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
         protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
-        protected override void OnPaintBackground(PaintEventArgs e) { Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint); }
+        protected override void OnPaintBackground(PaintEventArgs e) { }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            OnPaintBackground(e);
+            Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint);
             Graphics g = e.Graphics;
             Color fill, border, text;
             ButtonKind kind = Kind;
@@ -782,11 +869,11 @@ namespace VPalUi
 
         protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
         protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
-        protected override void OnPaintBackground(PaintEventArgs e) { Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint); }
+        protected override void OnPaintBackground(PaintEventArgs e) { }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            OnPaintBackground(e);
+            Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint);
             Graphics g = e.Graphics;
             RectangleF track = new RectangleF(1, (Height - 24) / 2f, 46, 24);
             Color tf = Checked ? Theme.Teal : Color.FromArgb(52, 66, 92);
@@ -820,11 +907,11 @@ namespace VPalUi
         }
 
         protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
-        protected override void OnPaintBackground(PaintEventArgs e) { Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint); }
+        protected override void OnPaintBackground(PaintEventArgs e) { }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            OnPaintBackground(e);
+            Theme.PaintParent(this, e, InvokePaintBackground, InvokePaint);
             Graphics g = e.Graphics;
             Size t = Theme.Measure("Ag", Font);
             int by = Math.Max(0, (Math.Min(Height, t.Height + 6) - 18) / 2);
@@ -1002,7 +1089,7 @@ namespace VPalUi
     public class Dot : Control
     {
         Color color = Theme.Faint;
-        public Color DotColor { get { return color; } set { color = value; Invalidate(); } }
+        public Color DotColor { get { return color; } set { if (value == color) return; color = value; Invalidate(); } }
 
         public Dot()
         {
@@ -1028,10 +1115,10 @@ namespace VPalUi
     {
         string server = "", state = "", players = "";
         Color stateColor = Theme.Faint;
-        public string ServerName { get { return server; } set { server = value ?? ""; Relayout(); } }
-        public string State { get { return state; } set { state = value ?? ""; Relayout(); } }
-        public Color StateColor { get { return stateColor; } set { stateColor = value; Invalidate(); } }
-        public string Players { get { return players; } set { players = value ?? ""; Relayout(); } }
+        public string ServerName { get { return server; } set { if ((value ?? "") == server) return; server = value ?? ""; Relayout(); } }
+        public string State { get { return state; } set { if ((value ?? "") == state) return; state = value ?? ""; Relayout(); } }
+        public Color StateColor { get { return stateColor; } set { if (value == stateColor) return; stateColor = value; Invalidate(); } }
+        public string Players { get { return players; } set { if ((value ?? "") == players) return; players = value ?? ""; Relayout(); } }
 
         public StatusCard()
         {
