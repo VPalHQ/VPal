@@ -1,5 +1,7 @@
 <p align="center"><img src="docs/vpal-logo.png" alt="VPal Server Command Center logo" width="260"></p>
 
+<p align="center"><img src="docs/vpal-card.png" alt="VPal: a free, open-source control panel for Palworld dedicated servers on your own Windows PC. Auto-restarts, backups, a Discord bot and the Pal Planner mobile app for your players." width="760"></p>
+
 # VPal Server Command Center
 
 A free control panel for running a **Palworld dedicated server on your own Windows PC**, made for families and small groups of friends, including console players.
